@@ -1,0 +1,22 @@
+version: '3'
+services:
+  mnist:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - prometheus
+
+  prometheus:
+    image: prom/prometheus:v2.30.3
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus:/etc/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+
+  cpu-metrics:
+    image: cpu-metrics
+    depends_on:
+      - prometheus

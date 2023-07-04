@@ -1,0 +1,4 @@
+scrape_configs:
+  - job_name: mnist
+    static_configs:
+      - targets: ['mnist:8000']
