@@ -1,13 +1,8 @@
 import requests
-import threading
-import time, sched
 
-running = True
-s = sched.scheduler(time.time, time.sleep)
-url = 'http://prometheus:9090/api/v1/query'
 metric_value = None
 
-def get_cpu_metrics():
+def get_cpu_metrics(url):
     params = {
             'query': "mnist_cpu_usage"
          }
@@ -30,7 +25,7 @@ def get_cpu_metrics():
         print("An error occurred during service uptime retrieval:", e)
         return None
         
-def get_memory_metrics():
+def get_memory_metrics(url):
     params = {
             'query': "mnist_ram_usage"
          }
@@ -53,7 +48,7 @@ def get_memory_metrics():
         print("An error occurred during service uptime retrieval:", e)
         return None
         
-def get_service_up_time():
+def get_service_up_time(url):
     params = {
             'query': "mnist_running_time"
          }
@@ -76,15 +71,17 @@ def get_service_up_time():
         print("An error occurred during service uptime retrieval:", e)
         return None
 
-def fetch_metrics_periodically():
-    cpu_percent = get_cpu_metrics()
-    ram_percent = get_memory_metrics()
-    up_time = get_service_up_time()
+def fetch_metrics_periodically(url):
+    cpu_percent = get_cpu_metrics(url)
+    ram_percent = get_memory_metrics(url)
+    up_time = get_service_up_time(url)
     if cpu_percent is not None and ram_percent is not None and up_time is not None:
-        print("CPU: " + cpu_percent + "% " + ("| RAM: ") + ram_percent + "% " + ("| Service_Run_Time: ") + up_time)
+        #print("CPU: " + cpu_percent + "% " + ("| RAM: ") + ram_percent + "% " + ("| Service_Run_Time: ") + up_time)
+        return cpu_percent, ram_percent, up_time
     else:
-        print("Metrics are not available just yet, please hold tight...")
-        
-while True:
-    fetch_metrics_periodically()
-    time.sleep(0.5)
+        return None
+
+def start_metrics_service(running, url):
+    #
+    metrics = fetch_metrics_periodically(url)
+    return metrics

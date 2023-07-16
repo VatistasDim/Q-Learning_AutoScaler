@@ -1,9 +1,7 @@
 version: '3'
 services:
   mnist:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: mnist
     depends_on:
       - prometheus
 
@@ -16,7 +14,9 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
 
-  cpu-metrics:
-    image: cpu-metrics
+  metrics-and-scale:
+    image: mas
     depends_on:
       - prometheus
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
