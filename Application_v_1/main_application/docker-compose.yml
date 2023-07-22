@@ -2,6 +2,8 @@ version: '3'
 services:
   mnist:
     image: mnist
+    ports:
+      - "9000:9000"
     depends_on:
       - prometheus
 
