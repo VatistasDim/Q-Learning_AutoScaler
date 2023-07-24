@@ -1,4 +1,4 @@
-import cpu_metrics, docker_api, logging, time
+import service_metrics as service_metrics, docker_api, logging, time
 
 url = 'http://prometheus:9090/api/v1/query'
 cpu_threshold = 20
@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 def fetch_data():
-    metrics = cpu_metrics.start_metrics_service(True, url)
+    metrics = service_metrics.start_metrics_service(True, url)
     if metrics is not None:
         time_up = metrics[2]
         if time_up != '0':
