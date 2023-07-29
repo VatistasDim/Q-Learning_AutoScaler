@@ -20,7 +20,7 @@ def get_cpu_metrics(url):
         else:
             return None
     except Exception as e:
-        print("An error occurred during service uptime retrieval:", e)
+        print("An error occurred during service CPU retrieval:", e)
         return None
         
 def get_memory_metrics(url):
@@ -41,7 +41,7 @@ def get_memory_metrics(url):
         else:
             return None
     except Exception as e:
-        print("An error occurred during service uptime retrieval:", e)
+        print("An error occurred during service RAM retrieval:", e)
         return None
         
 def get_service_up_time(url):
@@ -62,5 +62,5 @@ def get_service_up_time(url):
         else:
             return None
     except Exception as e:
-        print("An error occurred during service uptime retrieval:", e)
+        print("An error occurred during service running retrieval:", e)
         return None

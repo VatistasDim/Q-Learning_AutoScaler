@@ -1,9 +1,9 @@
-import get_service_api
+import prometheus_metrics as prometheus_metrics
 
 def fetch_metrics_periodically(url):
-    cpu_percent = get_service_api.get_cpu_metrics(url)
-    ram_percent = get_service_api.get_memory_metrics(url)
-    up_time = get_service_api.get_service_up_time(url)
+    cpu_percent = prometheus_metrics.get_cpu_metrics(url)
+    ram_percent = prometheus_metrics.get_memory_metrics(url)
+    up_time = prometheus_metrics.get_service_up_time(url)
     if cpu_percent is not None and ram_percent is not None and up_time is not None:
         return cpu_percent, ram_percent, up_time
     else:
