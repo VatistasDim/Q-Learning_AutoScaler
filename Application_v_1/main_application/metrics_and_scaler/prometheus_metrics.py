@@ -64,3 +64,16 @@ def get_service_up_time(url):
     except Exception as e:
         print("An error occurred during service running retrieval:", e)
         return None
+
+def fetch_metrics_periodically(url):
+    cpu_percent = get_cpu_metrics(url)
+    ram_percent = get_memory_metrics(url)
+    up_time = get_service_up_time(url)
+    if cpu_percent is not None and ram_percent is not None and up_time is not None:
+        return cpu_percent, ram_percent, up_time
+    else:
+        return None
+
+def start_metrics_service(running, url):
+    metrics = fetch_metrics_periodically(url)
+    return metrics
