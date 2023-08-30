@@ -1,9 +1,9 @@
 version: '3'
 services:
-  mnist:
-    image: mnist
+  application:
+    image: application
     ports:
-      - "9000:9000"
+      - "8082:8082"
     depends_on:
       - prometheus
 
@@ -17,7 +17,7 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
 
   metrics-and-scale:
-    image: mas
+    image: metrics-and-scaler
     depends_on:
       - prometheus
     volumes:

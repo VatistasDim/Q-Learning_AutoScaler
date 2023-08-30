@@ -1,14 +1,17 @@
-FROM python:3.9
+# Use the official Python image as the base image
+FROM python:3.9-slim
 
+# Set the working directory
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy the application code into the container
+COPY . /app
 
-COPY mnist.py .
+# Install required packages
+RUN pip install Flask prometheus_client psutil
 
-# Install Prometheus client library
-RUN pip install prometheus_client
-RUN pip install --no-cache-dir protobuf==3.20.0
+# Expose port for Flask app
+EXPOSE 8082
 
-CMD ["python", "mnist.py"]
+# Command to start Flask app
+CMD ["python", "app.py"]

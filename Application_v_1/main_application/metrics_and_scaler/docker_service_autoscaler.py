@@ -3,15 +3,15 @@ import random, time, docker, logging
 import prometheus_metrics
 
 url = 'http://prometheus:9090/api/v1/query'
-cpu_threshold = 20
-ram_threshold = 15
-service_name = 'mystack_mnist'
+cpu_threshold = 80
+ram_threshold = 90
+service_name = 'mystack_application'
 max_replicas = 7
 min_replicas = 1
 num_states = 10
 Q = np.zeros((num_states, num_states, 2))
 
-def discretize_state(cpu_value, ram_value):
+def discretize_state(cpu_value, ram_value): #TO-DO Needs check.
     cpu_state = int(cpu_value / 10)
     ram_state = int(ram_value / 10)
     return cpu_state, ram_state
@@ -21,7 +21,9 @@ def select_action(state):
     if random.uniform(0, 1) < epsilon:
         return random.choice([0, 1])
     else:
-        return np.argmax(Q[state[0], state[1], :])
+        cpu_state = min(max(state[0], 0), num_states - 1)
+        ram_state = min(max(state[1], 0), num_states - 1)
+        return np.argmax(Q[cpu_state, ram_state, :])
 
 def update_q_value(state, action, reward, next_state):
     alpha = 0.1
@@ -60,57 +62,112 @@ def get_current_replica_count(service_name):
 
 def fetch_data():
     try:
-        metrics = prometheus_metrics.start_metrics_service(True, url)
+        metrics = prometheus_metrics.start_metrics_service(url = url)
         if metrics is not None:
             time_up = metrics[2]
             if time_up != '0':
                 cpu_percent = int(float(metrics[0]))
                 ram_percent = int(float(metrics[1]))
                 time_up = int(float(time_up))
+                print("Metrics=",metrics)
                 return cpu_percent, ram_percent, time_up
-        print("No metrics available, wait...")
+        elif metrics is None:
+            print("No metrics available, wait...")
     except Exception as e:
         print("An error occurred during service CPU retrieval:", e)
     return None, None, None
 
-def main():
-    logger = logging.getLogger(__name__) 
-    # while True:
-    cpu_value, ram_value, _ = fetch_data()
-    if cpu_value is not None and ram_value is not None:
-        cpu_state, ram_state = discretize_state(cpu_value, ram_value)
-        state = (cpu_state, ram_state)
-        action = select_action(state)
-    else:
-        action = -1
-    if action == 0:
-        current_replicas = get_current_replica_count(service_name)
-        if current_replicas is not None and current_replicas < max_replicas:
-            scale_out(service_name, current_replicas + 1)
-            reward = get_reward(cpu_value, ram_value)
-            next_cpu_value, next_ram_value, _ = fetch_data()
-            next_cpu_state, next_ram_state = discretize_state(next_cpu_value, next_ram_value)
-            next_state = (next_cpu_state, next_ram_state)
-            update_q_value(state, action, reward, next_state)
-            logger.info(f"Horizontal Scale Out: Replicas increased to {current_replicas + 1}")
-            print("REWARD ---->",reward)
-        else:
-            logger.info(f"Already at maximum replicas: {max_replicas}")
-    elif action == 1:
-        current_replicas = get_current_replica_count(service_name)
-        if current_replicas is not None and current_replicas > min_replicas:
-            scale_in(service_name, 1)
-            reward = get_reward(cpu_value, ram_value)
-            next_cpu_value, next_ram_value, _ = fetch_data()
-            next_cpu_state, next_ram_state = discretize_state(next_cpu_value, next_ram_value)
-            next_state = (next_cpu_state, next_ram_state)
-            update_q_value(state, action, reward, next_state)
-            logger.info(f"Horizontal Scale In: Replicas decreased to {current_replicas - 1}")
-        else:
-            logger.info(f"Already at minimum replicas: {min_replicas}")
-    else:
-            logger.info("No action taken")
+# def fetch_data_with_retry():
+#     max_retries = 10  # Maximum number of retries
+#     retry_interval = 5  # Time to wait between retries (seconds)
+    
+#     for _ in range(max_retries):
+#         cpu_value, ram_value, _ = fetch_data()
+#         if cpu_value is not None and ram_value is not None:
+#             return cpu_value, ram_value
+#         else:
+#             print("Metrics not available, waiting for retry...")
+#             time.sleep(retry_interval)
+    
+#     print("Max retries reached. No metrics available.")
+#     return None, None
+
+# def main():
+#     logger = logging.getLogger(__name__) 
+#     # while True:
+#     cpu_value, ram_value = fetch_data_with_retry()
+#     if cpu_value is not None and ram_value is not None:
+#         cpu_state, ram_state = discretize_state(cpu_value, ram_value)
+#         state = (cpu_state, ram_state)
+#         action = select_action(state)
+#     else:
+#         action = -1
+#     if action == 0:
+#         current_replicas = get_current_replica_count(service_name)
+#         if current_replicas is not None and current_replicas < max_replicas:
+#             scale_out(service_name, current_replicas + 1)
+#             reward = get_reward(cpu_value, ram_value)
+#             next_cpu_value, next_ram_value, _ = fetch_data()
+#             next_cpu_state, next_ram_state = discretize_state(next_cpu_value, next_ram_value)
+#             next_state = (next_cpu_state, next_ram_state)
+#             update_q_value(state, action, reward, next_state)
+#             logger.info(f"Horizontal Scale Out: Replicas increased to {current_replicas + 1}")
+#             print("REWARD ---->",reward)
+#         else:
+#             logger.info(f"Already at maximum replicas: {max_replicas}")
+#     elif action == 1:
+#         current_replicas = get_current_replica_count(service_name)
+#         if current_replicas is not None and current_replicas > min_replicas:
+#             scale_in(service_name, 1)
+#             reward = get_reward(cpu_value, ram_value)
+#             next_cpu_value, next_ram_value, _ = fetch_data()
+#             next_cpu_state, next_ram_state = discretize_state(next_cpu_value, next_ram_value)
+#             next_state = (next_cpu_state, next_ram_state)
+#             update_q_value(state, action, reward, next_state)
+#             logger.info(f"Horizontal Scale In: Replicas decreased to {current_replicas - 1}")
+#         else:
+#             logger.info(f"Already at minimum replicas: {min_replicas}")
+#     else:
+#             logger.info("No action taken")
 
 if __name__ == "__main__":
+    print("Script is running...")
     while True:
-        main()
+        #time.sleep(1)
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.DEBUG)
+        handler = logging.StreamHandler()
+        cpu_value, ram_value, _ = fetch_data()
+        if cpu_value is not None and ram_value is not None:
+            cpu_state, ram_state = discretize_state(cpu_value, ram_value)
+            state = (cpu_state, ram_state)
+            action = select_action(state)
+        else:
+            action = -1
+        if action == 0:
+            current_replicas = get_current_replica_count(service_name)
+            if current_replicas is not None and current_replicas < max_replicas:
+                scale_out(service_name, current_replicas + 1)
+                reward = get_reward(cpu_value, ram_value)
+                next_cpu_value, next_ram_value, _ = fetch_data()
+                next_cpu_state, next_ram_state = discretize_state(next_cpu_value, next_ram_value)
+                next_state = (next_cpu_state, next_ram_state)
+                update_q_value(state, action, reward, next_state)
+                logger.info(f"Horizontal Scale Out: Replicas increased to {current_replicas + 1}")
+                print("REWARD ---->",reward)
+            else:
+                logger.info(f"Already at maximum replicas: {max_replicas}")
+        elif action == 1:
+            current_replicas = get_current_replica_count(service_name)
+            if current_replicas is not None and current_replicas > min_replicas:
+                scale_in(service_name, 1)
+                reward = get_reward(cpu_value, ram_value)
+                next_cpu_value, next_ram_value, _ = fetch_data()
+                next_cpu_state, next_ram_state = discretize_state(next_cpu_value, next_ram_value)
+                next_state = (next_cpu_state, next_ram_state)
+                update_q_value(state, action, reward, next_state)
+                logger.info(f"Horizontal Scale In: Replicas decreased to {current_replicas - 1}")
+            else:
+                logger.info(f"Already at minimum replicas: {min_replicas}")
+        else:
+                logger.info("No action taken")

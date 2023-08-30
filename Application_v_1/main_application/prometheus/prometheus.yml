@@ -1,5 +1,4 @@
 scrape_configs:
-  - job_name: mnist
+  - job_name: 'flask-app'
     static_configs:
-      - targets: ['mnist:8000']
-    scrape_interval: 5s
+      - targets: ['application:8000']

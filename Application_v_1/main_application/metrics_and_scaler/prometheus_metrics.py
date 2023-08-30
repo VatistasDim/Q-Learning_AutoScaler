@@ -1,11 +1,7 @@
 import requests
 
-metric_value = None
-
 def get_cpu_metrics(url):
-    params = {
-            'query': "mnist_cpu_usage"
-         }
+    params = {'query': "cpu_usage"}
     try:
         response = requests.get(url, params=params)
         if response.status_code == 200:
@@ -13,20 +9,17 @@ def get_cpu_metrics(url):
             if data is not None and 'data' in data and 'result' in data['data']:
                 results = data['data']['result']
                 if results:
-                    for result in results:
-                        metric_value = result['value']
-                    return metric_value[1]
+                    metric_value = results[0]['value'][1]
+                    return metric_value
             return None
         else:
             return None
     except Exception as e:
         print("An error occurred during service CPU retrieval:", e)
         return None
-        
+
 def get_memory_metrics(url):
-    params = {
-            'query': "mnist_ram_usage"
-         }
+    params = {'query': "ram_usage"}
     try:
         response = requests.get(url, params=params)
         if response.status_code == 200:
@@ -34,20 +27,17 @@ def get_memory_metrics(url):
             if data is not None and 'data' in data and 'result' in data['data']:
                 results = data['data']['result']
                 if results:
-                    for result in results:
-                        metric_value = result['value']
-                    return metric_value[1]
+                    metric_value = results[0]['value'][1]
+                    return metric_value
             return None
         else:
             return None
     except Exception as e:
         print("An error occurred during service RAM retrieval:", e)
         return None
-        
+
 def get_service_up_time(url):
-    params = {
-            'query': "mnist_running_time"
-         }
+    params = {'query': "running_time"}
     try:
         response = requests.get(url, params=params)
         if response.status_code == 200:
@@ -55,9 +45,8 @@ def get_service_up_time(url):
             if data is not None and 'data' in data and 'result' in data['data']:
                 results = data['data']['result']
                 if results:
-                    for result in results:
-                        metric_value = result['value']
-                    return metric_value[1]
+                    metric_value = results[0]['value'][1]
+                    return metric_value
             return None
         else:
             return None
@@ -74,6 +63,6 @@ def fetch_metrics_periodically(url):
     else:
         return None
 
-def start_metrics_service(running, url):
+def start_metrics_service(url):
     metrics = fetch_metrics_periodically(url)
     return metrics
