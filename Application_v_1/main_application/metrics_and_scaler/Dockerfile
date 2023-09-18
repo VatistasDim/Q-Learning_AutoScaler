@@ -8,4 +8,4 @@ RUN pip install requests docker numpy
 
 VOLUME /var/run/docker.sock
 
-CMD [ "python", "/app/docker_service_autoscaler.py" ]
+CMD [ "python", "-u", "/app/docker_service_autoscaler.py" ]

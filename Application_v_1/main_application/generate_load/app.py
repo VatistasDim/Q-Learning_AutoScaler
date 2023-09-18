@@ -8,12 +8,11 @@ running_time_gauge = Gauge('running_time', 'Running Time')
 
 app = Flask(__name__)
 
-def update_metrics():
-    while True:
-        cpu_usage_gauge.set(psutil.cpu_percent())
-        ram_usage_gauge.set(psutil.virtual_memory().percent)
-        running_time_gauge.set(time.time())
-        # time.sleep(5)
+# def update_metrics():
+#     cpu_usage_gauge.set(psutil.cpu_percent())
+#     ram_usage_gauge.set(psutil.virtual_memory().percent)
+#     running_time_gauge.set(time.time())
+#     print("Data Output:\n CPU OUTPUT: "+cpu_usage_gauge+" RAM OUTPUT: "+ram_usage_gauge)
 
 @app.route('/')
 def home():
@@ -24,11 +23,15 @@ def about():
     return render_template('about.html')
 
 if __name__ == '__main__':
-    start_http_server(8000)
-
-    metric_update_thread = threading.Thread(target=update_metrics)
-    metric_update_thread.daemon = True
-    metric_update_thread.start()
-
     app.run(host='0.0.0.0', port=8082)
-
+    while True:
+        cpu_usage_gauge.set(psutil.cpu_percent())
+        ram_usage_gauge.set(psutil.virtual_memory().percent)
+        running_time_gauge.set(time.time())
+        print("Data Output:\n CPU OUTPUT: "+cpu_usage_gauge+" RAM OUTPUT: "+ram_usage_gauge)
+        start_http_server(8000)
+    # while True:
+    #     metric_update_thread = threading.Thread(target=update_metrics)
+    #     metric_update_thread.daemon = True
+    #     metric_update_thread.start()
+    #     time.sleep(1)
