@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animated Page</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body>
+    <nav>
+        <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/about">About Us</a></li>
+            <li><a href="/graphics">graphics</a></li>
+        </ul>
+    </nav>
+    <div class="container">
+        <h1 class="heading">Welcome to the Animated Page</h1>
+        <button class="button animated-slide-in">Slide In Button</button>
+        <button class="button animated-fade-in">Fade In Button</button>
+        <div class="animated-rotate">Rotating Element</div>
+        <div class="animated-pulse">Pulsing Element</div>
+    </div>
+</body>
+
+</html>

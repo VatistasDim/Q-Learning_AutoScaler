@@ -14,4 +14,4 @@ RUN pip install Flask prometheus_client psutil
 EXPOSE 8082
 
 # Command to start Flask app
-CMD ["python", "-u", "app.py"]
+CMD ["python", "app.py"]

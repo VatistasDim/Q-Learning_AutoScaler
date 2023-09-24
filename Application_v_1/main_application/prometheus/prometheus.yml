@@ -2,3 +2,4 @@ scrape_configs:
   - job_name: 'flask-app'
     static_configs:
       - targets: ['application:8000']
+    scrape_interval: 5s
