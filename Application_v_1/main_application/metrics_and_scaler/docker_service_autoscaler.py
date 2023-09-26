@@ -57,10 +57,7 @@ def scale_in(service_name, scale_out_factor):
     client = docker.from_env()
     service = client.services.get(service_name)
     current_replicas = get_current_replica_count(service_name)
-    if current_replicas is not None:
-        print(f"Service '{service_name}' not found.")
-        return
-    desired_replicas = min(current_replicas + scale_out_factor, max_replicas)
+    desired_replicas = current_replicas - scale_out_factor
     service.scale(desired_replicas)
 
 def get_current_replica_count(service_prefix):
@@ -114,22 +111,27 @@ if __name__ == "__main__":
                 if action == 0:
                     current_replicas = get_current_replica_count(service_name)
                     if current_replicas is not None and current_replicas < max_replicas:
-                        #scale_out(service_name, current_replicas + 1)
+                        scale_out(service_name, current_replicas + 1)
+                        print(f"Horizontal Scale Out: Replicas increased to: {current_replicas}, system waits 5 seconds")
+                        time.sleep(5)
+                        cpu_threshold = cpu_threshold * current_replicas
+                        cpu_value, ram_value, _ = fetch_data()
+                        print("Calculating reward...")
+                        time.sleep(5)
                         reward = get_reward(cpu_value, ram_value)
+                        print(f"Reward was: {reward} with cpu val: {cpu_value} and ram val: {ram_value}")
                         next_cpu_value, next_ram_value, _ = fetch_data()
                         next_cpu_state, next_ram_state = discretize_state(next_cpu_value, next_ram_value)
                         next_state = (next_cpu_state, next_ram_state)
                         update_q_value(state, action, reward, next_state)
                         logger.info(f"Horizontal Scale Out: Replicas increased to {current_replicas + 1}")
-                        print(f"Horizontal Scale Out: Replicas increased to: {current_replicas}")
-                        print("REWARD ---->",reward)
                     else:
                         logger.info(f"Already at maximum replicas: {max_replicas}")
                         print("Already at maximum replicas")
                 elif action == 1:
                     current_replicas = get_current_replica_count(service_name)
                     if current_replicas is not None and current_replicas > min_replicas:
-                        #scale_in(service_name, 1)
+                        scale_in(service_name, 1)
                         reward = get_reward(cpu_value, ram_value)
                         next_cpu_value, next_ram_value, _ = fetch_data()
                         next_cpu_state, next_ram_state = discretize_state(next_cpu_value, next_ram_value)

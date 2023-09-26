@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, send_file
 from prometheus_client import start_http_server, Gauge
 import time, psutil, threading
 
@@ -32,7 +32,8 @@ def graphics():
 
 @app.route('/streaming')
 def streaming():
-    return render_template('streaming.html')
+    video_path = 'static/video/video_1.mp4'
+    return send_file(video_path, mimetype='video/mp4')
 
 if __name__ == '__main__':
     
