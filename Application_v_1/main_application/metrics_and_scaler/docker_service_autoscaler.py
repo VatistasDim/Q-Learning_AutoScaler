@@ -11,6 +11,7 @@ min_replicas = 1
 num_states = 10
 Q = np.zeros((num_states, num_states, 2))
 iteration = 1
+reward = 0
 
 def discretize_state(cpu_value, ram_value): #TO-DO Needs check.
     cpu_state = int(cpu_value / 10)
@@ -22,7 +23,7 @@ def discretize_state(cpu_value, ram_value): #TO-DO Needs check.
     return cpu_state, ram_state
 
 def select_action(state):
-    epsilon = 0.8
+    epsilon = 0.5
     if random.uniform(0, 1) < epsilon:
         return random.choice([0, 1])
     else:
@@ -31,8 +32,8 @@ def select_action(state):
         return np.argmax(Q[cpu_state, ram_state, :])
 
 def update_q_value(state, action, reward, next_state):
-    alpha = 0.1
-    gamma = 0.9
+    alpha = 0.5
+    gamma = 0.4
     Q[state[0], state[1], action] = Q[state[0], 
                                       state[1], 
                                       action] + alpha * (reward + gamma * np.max(Q[next_state[0], 
@@ -43,9 +44,9 @@ def update_q_value(state, action, reward, next_state):
 
 def get_reward(cpu_value, ram_value):
     if cpu_value <= cpu_threshold and ram_value <= ram_threshold:
-        return 1
+        return 10
     else:
-        return 0
+        return -5
 
 def scale_out(service_name, desired_replicas):
     client = docker.from_env()
@@ -72,7 +73,7 @@ def get_current_replica_count(service_prefix):
 
 def fetch_data():
     try:
-        metrics = prometheus_metrics.start_metrics_service(url = url)
+        metrics = prometheus_metrics.start_metrics_service(url=url)
         if metrics is not None:
             time_up = metrics[2]
             if time_up != '0':
@@ -80,24 +81,32 @@ def fetch_data():
                 ram_percent = int(float(metrics[1]))
                 time_up = int(float(time_up))
                 return cpu_percent, ram_percent, time_up
-        elif metrics is None:
-            return None, None, None
+        return None, None, None
     except Exception as e:
         print("An error occurred during service metrics retrieval:", e)
-    
+        return None, None, None 
+
+
+def Calculate_Thresholds():
+    current_replicas = get_current_replica_count(service_name)
+    ram_threshold = 20
+    cpu_threshold = 10 + (current_replicas - 1) * 10 if current_replicas <= 6 else 70
+    print(f"Thresholds calculated as CPU:{cpu_threshold}, RAM: {ram_threshold}")
+    return cpu_threshold, ram_threshold
 
 if __name__ == "__main__":
     print("Script is running...")
     while True:
-        time.sleep(5)
         logger = logging.getLogger(__name__)
-        print("--------Iteration No:", str(iteration))
+        print(f"\n--------Iteration No:{iteration}")
+        time.sleep(5)
         logger.setLevel(logging.DEBUG)
         handler = logging.StreamHandler()
         cpu_value, ram_value, _ = fetch_data()
         if cpu_value is not None and ram_value is not None:
             print(f"Metrics: |CPU:{str(cpu_value)}% |RAM:{str(ram_value)} % |Time running:{str(_)}s")
             if  cpu_threshold < cpu_value or ram_threshold < ram_value:
+                print(f"Thresholds:{cpu_threshold, ram_threshold} and Cpu & Ram Values:{cpu_value, ram_value}")
                 if cpu_value is not None and ram_value is not None:
                     cpu_state, ram_state = discretize_state(float(cpu_value), float(ram_value))
                     print(f"Discretized values: cpu={cpu_state} ram={ram_state}")
@@ -112,19 +121,24 @@ if __name__ == "__main__":
                     current_replicas = get_current_replica_count(service_name)
                     if current_replicas is not None and current_replicas < max_replicas:
                         scale_out(service_name, current_replicas + 1)
-                        print(f"Horizontal Scale Out: Replicas increased to: {current_replicas}, system waits 5 seconds")
-                        time.sleep(5)
-                        cpu_threshold = cpu_threshold * current_replicas
-                        cpu_value, ram_value, _ = fetch_data()
-                        print("Calculating reward...")
-                        time.sleep(5)
-                        reward = get_reward(cpu_value, ram_value)
-                        print(f"Reward was: {reward} with cpu val: {cpu_value} and ram val: {ram_value}")
-                        next_cpu_value, next_ram_value, _ = fetch_data()
-                        next_cpu_state, next_ram_state = discretize_state(next_cpu_value, next_ram_value)
-                        next_state = (next_cpu_state, next_ram_state)
-                        update_q_value(state, action, reward, next_state)
-                        logger.info(f"Horizontal Scale Out: Replicas increased to {current_replicas + 1}")
+                        print(f"Horizontal Scale Out: Replicas increased to: {current_replicas}, system waits 10 seconds...")
+                        time.sleep(10)
+                        cpu_threshold, ram_threshold = Calculate_Thresholds()
+                        tuple_data = fetch_data()
+                        has_data = all(ele is None for ele in tuple_data)
+                        if not has_data:
+                            cpu_value, ram_value, _ = tuple_data
+                            print("Calculating reward...")
+                            time.sleep(10)
+                            reward = get_reward(cpu_value, ram_value)
+                            print(f"Reward was: {reward} with cpu val: {cpu_value} and ram val: {ram_value}")
+                            next_cpu_value, next_ram_value, _ = fetch_data()
+                            next_cpu_state, next_ram_state = discretize_state(next_cpu_value, next_ram_value)
+                            next_state = (next_cpu_state, next_ram_state)
+                            update_q_value(state, action, reward, next_state)
+                            logger.info(f"Horizontal Scale Out: Replicas increased to {current_replicas + 1}")
+                        else:
+                            print("Something went wrong when trying to fetch the data for calculation the reward. System will retry in 10 seconds...")
                     else:
                         logger.info(f"Already at maximum replicas: {max_replicas}")
                         print("Already at maximum replicas")
@@ -132,12 +146,17 @@ if __name__ == "__main__":
                     current_replicas = get_current_replica_count(service_name)
                     if current_replicas is not None and current_replicas > min_replicas:
                         scale_in(service_name, 1)
+                        print(f"Horizontal Scale In: Replicas decreased to: {current_replicas -1}, system waits 5 seconds")
+                        time.sleep(10)
+                        cpu_threshold, ram_threshold = Calculate_Thresholds()
+                        cpu_value, ram_value, _ = fetch_data()
+                        print("Calculating reward...")
                         reward = get_reward(cpu_value, ram_value)
+                        print(f"Reward was: {reward} with cpu val: {cpu_value} and ram val: {ram_value}")
                         next_cpu_value, next_ram_value, _ = fetch_data()
                         next_cpu_state, next_ram_state = discretize_state(next_cpu_value, next_ram_value)
                         next_state = (next_cpu_state, next_ram_state)
                         update_q_value(state, action, reward, next_state)
-                        logger.info(f"Horizontal Scale In: Replicas decreased to {current_replicas - 1}")
                         print(f"Horizontal Scale In: Replicas decreased to:{current_replicas}")
                     else:
                         logger.info(f"Already at minimum replicas: {min_replicas}")
@@ -147,8 +166,16 @@ if __name__ == "__main__":
                     print("No action taken")
                 iteration += 1
             else:
-                logger.info("Logger Level(info): No action taken, because the cpu value is not greater than cpu or ram threshold.")
-                print("No action taken, because the cpu value or ram value is not greater than cpu or ram threshold.")
-                iteration += 1
+                current_replicas = get_current_replica_count(service_name)
+                if current_replicas > min_replicas:
+                    scale_in(service_name, 1)
+                    print(f"Removing replicas because there is no demand, current replicas: {current_replicas}")
+                    iteration += 1
+                    cpu_threshold = 8
+                    ram_threshold = 20
+                else:
+                    logger.info("Logger Level(info): No action taken, because the cpu value is not greater than cpu or ram threshold.")
+                    print("No action taken, because the cpu value or ram value is not greater than cpu or ram threshold.")
+                    iteration += 1
         else:
             print("No metrics available, wait...")  
