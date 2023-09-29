@@ -97,9 +97,9 @@ def Calculate_Thresholds():
 if __name__ == "__main__":
     print("Script is running...")
     while True:
+        time.sleep(5)
         logger = logging.getLogger(__name__)
         print(f"\n--------Iteration No:{iteration}")
-        time.sleep(5)
         logger.setLevel(logging.DEBUG)
         handler = logging.StreamHandler()
         cpu_value, ram_value, _ = fetch_data()
@@ -121,15 +121,15 @@ if __name__ == "__main__":
                     current_replicas = get_current_replica_count(service_name)
                     if current_replicas is not None and current_replicas < max_replicas:
                         scale_out(service_name, current_replicas + 1)
-                        print(f"Horizontal Scale Out: Replicas increased to: {current_replicas}, system waits 10 seconds...")
-                        time.sleep(10)
+                        print(f"Horizontal Scale Out: Replicas increased to: {current_replicas}, system waits 5 seconds...")
+                        time.sleep(5)
                         cpu_threshold, ram_threshold = Calculate_Thresholds()
                         tuple_data = fetch_data()
                         has_data = all(ele is None for ele in tuple_data)
                         if not has_data:
                             cpu_value, ram_value, _ = tuple_data
                             print("Calculating reward...")
-                            time.sleep(10)
+                            time.sleep(1)
                             reward = get_reward(cpu_value, ram_value)
                             print(f"Reward was: {reward} with cpu val: {cpu_value} and ram val: {ram_value}")
                             next_cpu_value, next_ram_value, _ = fetch_data()
@@ -138,7 +138,8 @@ if __name__ == "__main__":
                             update_q_value(state, action, reward, next_state)
                             logger.info(f"Horizontal Scale Out: Replicas increased to {current_replicas + 1}")
                         else:
-                            print("Something went wrong when trying to fetch the data for calculation the reward. System will retry in 10 seconds...")
+                            print("Something went wrong when trying to fetch the data for calculation the reward. System will retry in 30 seconds...")
+                            time.sleep(30)
                     else:
                         logger.info(f"Already at maximum replicas: {max_replicas}")
                         print("Already at maximum replicas")
@@ -147,10 +148,11 @@ if __name__ == "__main__":
                     if current_replicas is not None and current_replicas > min_replicas:
                         scale_in(service_name, 1)
                         print(f"Horizontal Scale In: Replicas decreased to: {current_replicas -1}, system waits 5 seconds")
-                        time.sleep(10)
+                        time.sleep(5)
                         cpu_threshold, ram_threshold = Calculate_Thresholds()
                         cpu_value, ram_value, _ = fetch_data()
                         print("Calculating reward...")
+                        time.sleep(1)
                         reward = get_reward(cpu_value, ram_value)
                         print(f"Reward was: {reward} with cpu val: {cpu_value} and ram val: {ram_value}")
                         next_cpu_value, next_ram_value, _ = fetch_data()
@@ -173,6 +175,7 @@ if __name__ == "__main__":
                     iteration += 1
                     cpu_threshold = 8
                     ram_threshold = 20
+                    time.sleep(5)
                 else:
                     logger.info("Logger Level(info): No action taken, because the cpu value is not greater than cpu or ram threshold.")
                     print("No action taken, because the cpu value or ram value is not greater than cpu or ram threshold.")
