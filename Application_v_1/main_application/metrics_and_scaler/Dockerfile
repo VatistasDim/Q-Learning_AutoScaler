@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY  / .
 
-RUN pip install requests docker numpy
+RUN pip install requests docker numpy matplotlib
 
 VOLUME /var/run/docker.sock
 

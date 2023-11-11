@@ -7,6 +7,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY mnist.py .
 
+EXPOSE 8082
+
 # Install Prometheus client library
 RUN pip install prometheus_client
 RUN pip install --no-cache-dir protobuf==3.20.0

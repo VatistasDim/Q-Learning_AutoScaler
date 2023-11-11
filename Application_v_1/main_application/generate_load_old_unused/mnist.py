@@ -6,11 +6,11 @@ from prometheus_client import start_http_server, Counter, Gauge
 import time, psutil
 
 counter = Counter('mnist_counter', 'MNIST Counter')
-cpu_usage_gauge = Gauge('mnist_cpu_usage', 'CPU_Usage')
-ram_usage_gauge = Gauge('mnist_ram_usage', 'Ram_Usage')
-running_time_gauge = Gauge('mnist_running_time', 'Running Time')
+cpu_usage_gauge = Gauge('cpu_usage', 'CPU_Usage')
+ram_usage_gauge = Gauge('ram_usage', 'Ram_Usage')
+running_time_gauge = Gauge('running_time', 'Running Time')
 
-start_http_server(8000)
+start_http_server(8082)
 
 # MNIST dataset
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
@@ -21,6 +21,8 @@ x_train, x_test = x_train / 255.0, x_test / 255.0
 model = Sequential([
     Flatten(input_shape=(28, 28)),
     Dense(128, activation='relu'),
+    Dense(256, activation='relu'),
+    Dense(512, activation='relu'),
     Dense(10, activation='softmax')
 ])
 
