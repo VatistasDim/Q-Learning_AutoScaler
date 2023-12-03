@@ -1,5 +1,10 @@
 scrape_configs:
   - job_name: 'flask-app'
     static_configs:
+<<<<<<< Updated upstream
       - targets: ['application:8000']
     scrape_interval: 5s
+=======
+      - targets: ['application:8082']
+    scrape_interval: 1s
+>>>>>>> Stashed changes

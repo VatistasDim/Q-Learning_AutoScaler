@@ -5,7 +5,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY mnist.py .
+COPY . /app
 
 # Install Prometheus client library
 RUN pip install prometheus_client

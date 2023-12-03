@@ -1,27 +1,49 @@
-version: '3'
+version: '3.1'
+    
 services:
   application:
-    image: application
+    image: application-mnistdocker
     ports:
       - "8082:8082"
+<<<<<<< Updated upstream
     depends_on:
       - prometheus
+=======
+      - "8501:8501"
+>>>>>>> Stashed changes
 
   prometheus:
     image: prom/prometheus:v2.30.3
     ports:
-      - 9090:9090
+      - "9090:9090"
     volumes:
       - ./prometheus:/etc/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
-
-  metrics-and-scale:
-    image: metrics-and-scaler
+<<<<<<< Updated upstream
+=======
     depends_on:
-      - prometheus
+      - application  
+>>>>>>> Stashed changes
+
+  load-balancer:
+    image: load-balancer
     volumes:
+<<<<<<< Updated upstream
+=======
+      - ~/tutorial/Application_v_1/plots:/plots
+      - ~/tutorial/Application_v_1/QSavedWeights:/QSavedWeights
+>>>>>>> Stashed changes
       - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - create-requests
+
+  create-requests:
+    image: create-requests
+    depends_on:
+      - application
+    deploy:
+      replicas: 2
 
   grafana:
     image: grafana/grafana:latest
