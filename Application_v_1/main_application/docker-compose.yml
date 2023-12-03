@@ -29,7 +29,7 @@ services:
     depends_on:
       - application
     deploy:
-      replicas: 2
+      replicas: 1
 
   grafana:
     image: grafana/grafana:latest

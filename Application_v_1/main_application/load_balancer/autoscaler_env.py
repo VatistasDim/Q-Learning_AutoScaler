@@ -117,7 +117,7 @@ def get_reward(cpu_value, ram_value, cpu_threshold, ram_threshold):
         ram_threshold_10_percent = ram_value * 0.05
         cpu_threshold_merged = cpu_threshold + cpu_threshold_10_percent
         ram_threshold_merged = ram_threshold + ram_threshold_10_percent
-        print(f"CPU_10%: {cpu_threshold_merged} RAM_10%:{ram_threshold_merged}")
+        print(f"CPU_Plus_10%: {cpu_threshold_merged} RAM_Plus_10%:{ram_threshold_merged}")
         if cpu_value <= cpu_threshold_merged and ram_value <= ram_threshold_merged:
             print(f"Reward={20}, cpu_value={cpu_value} <= {cpu_threshold_merged} and ram_value={ram_value} <= {ram_threshold_merged}")
             return 20
@@ -168,16 +168,17 @@ def Calculate_Thresholds():
     """
     current_replicas = get_current_replica_count(service_name)
     if current_replicas is not None:
-        cpu_threshold = 25 + (current_replicas - 1) * 8 if current_replicas <= 10 else 99
-        ram_threshold = 30 + (current_replicas - 1) * 6 if current_replicas <= 10 else 99
+        cpu_threshold = 1 + (current_replicas - 1) * 5 if current_replicas <= 10 else 99
+        ram_threshold = 10 + (current_replicas - 1) * 5 if current_replicas <= 10 else 99
     else:
-        cpu_threshold = 8  # Default value if replicas count is not available
+        cpu_threshold = 0  # Default value if replicas count is not available
         ram_threshold = 10  # Default value if replicas count is not available
 
     print(f"Thresholds calculated as CPU:{cpu_threshold}, RAM: {ram_threshold}")
     return cpu_threshold, ram_threshold
 
 url = 'http://prometheus:9090/api/v1/query'
+
 class AutoscaleEnv(gym.Env):
     def __init__(self, service_name, min_replicas, max_replicas, cpu_threshold, ram_threshold, num_states, max_time_minutes=10):
         super(AutoscaleEnv, self).__init__()

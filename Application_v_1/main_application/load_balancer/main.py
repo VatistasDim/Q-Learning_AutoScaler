@@ -14,9 +14,8 @@ ram_threshold = 10
 max_replicas = 10
 min_replicas = 1
 num_states = 2
-Q_file_path = "/QSavedValues/q_values.npy"
-Q = np.load(Q_file_path) if Q_file_path else np.zeros((num_states, num_states, 2))
-Q = np.zeros((num_states, num_states, 2))
+Q_file = "q_values.npy"
+Q = np.load(Q_file) if Q_file else np.zeros((num_states, num_states, 2))
 iteration = 1
 
 def discretize_state(cpu_value, ram_value):
@@ -131,9 +130,10 @@ if __name__ == "__main__":
     """
     The main method for this project
     """
+    train_steps = 101
     now = datetime.now()
     dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
-    print(f"Application Information:\nStart date & time:{dt_string}\nObservable service name:{service_name}\nContext urls:{url}, {application_url}\n")
+    print(f"Application Information:\nStart date & time:{dt_string}\nObservable service name:{service_name}\nContext urls:{url}, {application_url},\nTrain Steps = {train_steps}\n")
     mse_values = [] # Initialize empty list to store MSE values
     rewards = []
     replicas_count = []
@@ -141,7 +141,7 @@ if __name__ == "__main__":
     validation_interval = 50 # Perform validation every 20 iterations
     env = AutoscaleEnv(service_name, min_replicas, max_replicas, cpu_threshold, ram_threshold, num_states)
     obs = env.reset()
-    for iteration in range(1, 51):  # Run iterations
+    for iteration in range(1, train_steps):  # Run iterations
         logger = logging.getLogger(__name__)  # Initialize a logger
         print(f"\n--------Iteration No:{iteration}")  # Print the current iteration number
         logger.setLevel(logging.DEBUG)  # Set the logger level to debug
@@ -237,7 +237,7 @@ if __name__ == "__main__":
                     mse = calculate_mse(Q, target_values) # Calculate MSE
                     mse_values.append(mse)
 
-                    if iteration % 50 == 0:  # Save plot every 50 iterations
+                    if iteration % 10 == 0:  # Save plot every 50 iterations
                         print("Plotting...")
                         plot_values(range(1, iteration+1, 10), mse_values[::10], save_path)
             np.save('/QSavedWeights/q_values.npy', Q)
