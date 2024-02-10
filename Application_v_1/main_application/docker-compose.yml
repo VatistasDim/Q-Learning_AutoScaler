@@ -5,6 +5,7 @@ services:
     image: application
     ports:
       - "8082:8082"
+      - "8000:8000"
 
   prometheus:
     image: prom/prometheus:v2.30.3
@@ -21,8 +22,10 @@ services:
       - ~/tutorial/Application_v_1/plots:/plots
       - ~/tutorial/Application_v_1/QSavedWeights:/QSavedWeights
       - /var/run/docker.sock:/var/run/docker.sock
-    depends_on:
-      - create-requests
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
 
   grafana:
     image: grafana/grafana:latest
