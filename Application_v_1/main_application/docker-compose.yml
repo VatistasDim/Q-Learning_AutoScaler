@@ -1,10 +1,11 @@
-version: '3.1'
+version: '3.8'
     
 services:
   application:
     image: application-mnistdocker
     ports:
       - "8082:8082"
+      - "8501:8501"
 
   prometheus:
     image: prom/prometheus:v2.30.3
@@ -22,18 +23,16 @@ services:
       - ~/tutorial/Application_v_1/QSavedWeights:/QSavedWeights
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
-      - create-requests
+      - application
 
-  create-requests:
-    image: create-requests
+  produce-load:
+    image: produce-load
     depends_on:
       - application
-    deploy:
-      replicas: 1
 
   grafana:
     image: grafana/grafana:latest
     ports:
       - "3000:3000"
     depends_on:
-      - prometheus
+      - application

@@ -1,10 +1,11 @@
 import numpy as np
-import random, logging
+import random, logging, docker
 import prometheus_metrics
 import matplotlib.pyplot as plt
 import time
 from datetime import datetime
 from autoscaler_env import AutoscaleEnv
+import skfuzzy as fuzz
 
 url = 'http://prometheus:9090/api/v1/query'
 service_name = 'mystack_application'
@@ -14,9 +15,22 @@ ram_threshold = 10
 max_replicas = 10
 min_replicas = 1
 num_states = 2
-Q_file = "q_values.npy"
-Q = np.load(Q_file) if Q_file else np.zeros((num_states, num_states, 2))
+# Q_file = "q_values.npy"
+# Q = np.load(Q_file) if Q_file else np.zeros((num_states, num_states, 2))
+Q = np.zeros((num_states, num_states, 2))
 iteration = 1
+
+# Define fuzzy input variables (Universe and membership functions)
+cpu = np.arange(0, 101)
+ram = np.arange(0, 101)
+
+# Define fuzzy output variable (Universe and membership functions)
+# action = np.arange(0, 2)
+
+cpu_high = fuzz.trimf(cpu, [50, 100, 100])
+cpu_low = fuzz.trimf(cpu, [0, 0, 50])
+ram_high = fuzz.trimf(ram, [50, 100, 100])
+ram_low = fuzz.trimf(ram, [0, 0, 50])
 
 def discretize_state(cpu_value, ram_value):
     """
@@ -124,13 +138,44 @@ def plot_values(iterations, mse_values, save_path):
     plt.legend()
     plt.savefig(f'{save_path}/mse_plot_iteration_{iteration}.png')
     
+def get_docker_services():
+    try:
+        # Connect to the Docker daemon
+        client = docker.from_env()
+
+        # Get a list of all services
+        services = client.services.list()
+
+        # Extract relevant information from each service
+        service_info = []
+        for service in services:
+            service_info.append({
+                'ID': service.id,
+                'Name': service.name,
+                'Replicas': service.attrs['Spec']['Mode']['Replicated']['Replicas'],
+                'Image': service.attrs['Spec']['TaskTemplate']['ContainerSpec']['Image'],
+                'Ports': service.attrs.get('Endpoint', {}).get('Ports', [])
+            })
+        return service_info
+
+    except docker.errors.APIError as e:
+        print(f"Error connecting to Docker: {e}")
+        return None
 # This code implementing a control loop that monitors CPU and RAM metrics, takes certain actions based on thresholds and conditions, and updates a Q-value. 
 # It also handles scaling operations based on the current state and actions.
 if __name__ == "__main__":
     """
     The main method for this project
     """
-    train_steps = 101
+    env = AutoscaleEnv(service_name, min_replicas, max_replicas, cpu_threshold, ram_threshold, num_states)
+    # while True:
+    #     docker_services = get_docker_services()
+    #     if docker_services is not None:
+    #         for service in docker_services:
+    #             print(service)
+    #     time.sleep(10)
+    Run_using_fuzzy = True
+    train_steps = 200
     now = datetime.now()
     dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
     print(f"Application Information:\nStart date & time:{dt_string}\nObservable service name:{service_name}\nContext urls:{url}, {application_url},\nTrain Steps = {train_steps}\n")
@@ -138,8 +183,7 @@ if __name__ == "__main__":
     rewards = []
     replicas_count = []
     save_path = '/plots' # Set the save path inside the container
-    validation_interval = 50 # Perform validation every 20 iterations
-    env = AutoscaleEnv(service_name, min_replicas, max_replicas, cpu_threshold, ram_threshold, num_states)
+    validation_interval = train_steps - 1 # Perform validation every x iterations
     obs = env.reset()
     for iteration in range(1, train_steps):  # Run iterations
         logger = logging.getLogger(__name__)  # Initialize a logger
@@ -152,7 +196,7 @@ if __name__ == "__main__":
         if iteration % validation_interval == 0:
             print("\n------Validation phase starts. Please wait until Validation Phase stop")
             validation_rewards = []
-            for _ in range(10):  # Run 10 validation episodes
+            for _ in range(50):  # Run 50 validation episodes
                 # Use the validation environment (not the training environment)
                 validation_obs = env.reset()
                 validation_reward = 0
@@ -178,58 +222,50 @@ if __name__ == "__main__":
             if cpu_threshold < cpu_value or ram_threshold < ram_value:
                 # Check if CPU and RAM values are not None
                 if cpu_value is not None and ram_value is not None:
-                    
                     # Discretize states
                     cpu_state, ram_state = discretize_state(float(cpu_value), float(ram_value))
+                    if Run_using_fuzzy is not True:
+                        # Select an action based on your Q-learning logic
+                        action = select_action(Q, cpu_state, ram_state)
+                    if Run_using_fuzzy:
+                        # Fuzzy Inference for scaling out
+                        rule1 = fuzz.relation_min(fuzz.trimf(cpu, [cpu_value - 10, cpu_value, cpu_value + 10])[:, np.newaxis],
+                                                fuzz.trimf(ram, [ram_value - 10, ram_value, ram_value + 10])[:, np.newaxis])
+                        action_scale_out = np.array([1, 0])
+                        action_activation_scale_out = np.fmin(rule1[:, :, np.newaxis], action_scale_out)
 
-                    # Select an action based on your Q-learning logic
-                    action = select_action(Q, cpu_state, ram_state)
+                        # Fuzzy Inference for scaling in (corrected)
+                        rule2 = fuzz.relation_min(fuzz.trimf(cpu, [cpu_value - 10, cpu_value, cpu_value + 10])[:, np.newaxis],
+                                                fuzz.trimf(ram, [ram_value - 10, ram_value, ram_value + 10])[:, np.newaxis])
+                        action_scale_in = np.array([0, 1])
+                        action_activation_scale_in = np.fmin(rule2[:, :, np.newaxis], action_scale_in)
+
+                        # Combine the fuzzy inferences
+                        aggregated = np.fmax(action_activation_scale_out, action_activation_scale_in)
+
+                        # Defuzzification
+                        universe_of_discourse = np.arange(0, 3)
+                        max_index = np.unravel_index(np.argmax(aggregated), aggregated.shape)
+                        print(f"Max-Index = {max_index}")
+                        action_result = universe_of_discourse[max_index[2]]
+                        print(f"Action_result={action_result}")
+                        selected_action = int(round(action_result))
+                        print("Selected Action:", selected_action)
+                        if action_result >= 0.5:
+                            # Scale out action
+                            action = 0
+                        else:
+                            # Scale in action
+                            action = 1
 
                     # Take a step in the environment
                     next_obs, reward, done, _ = env.step(action)
-
                     next_cpu_state, next_ram_state = discretize_state(float(next_obs[0]), float(next_obs[1]))
                     next_state = (next_cpu_state, next_ram_state)
                     update_q_value(Q, (cpu_state, ram_state), action, reward, (next_cpu_state, next_ram_state))
-                    
                     iteration += 1  # Increment iteration count
                     # Log Q-values
                     print(f"Iteration: {iteration}, Q-values: \n{Q}")
-
-                    # Log rewards
-                    # print(f"Iteration: {iteration}, Reward: {reward}")
-                    
-                    # Calculate MSE and store in list
-                    target_values = np.array([[cpu_state, ram_state]])  # Use the current state as target values
-                    mse = calculate_mse(Q, target_values) # Calculate MSE
-                    mse_values.append(mse)
-
-                    if iteration % 50 == 0:  # Save plot every 10 iterations
-                        print("Plotting...")
-                        plot_values(range(1, iteration+1, 10), mse_values[::10], save_path)
-                
-            else:  # If CPU and RAM do not exceed thresholds
-                # Check if CPU and RAM values are not None
-                if cpu_value is not None and ram_value is not None:
-                    print(f"Metrics: |CPU:{str(cpu_value)}% |RAM:{str(ram_value)} % |Time running:{str(time_running)}s")  # Print metrics
-
-                    # Discretize states
-                    cpu_state, ram_state = discretize_state(float(cpu_value), float(ram_value))
-
-                    # Select an action based on your Q-learning logic
-                    action = select_action((cpu_state, ram_state), Q)
-
-                    # Take a step in the environment
-                    next_obs, reward, done, _ = env.step(action)
-
-                    # Update Q-values based on your Q-learning logic
-                    next_cpu_state, next_ram_state = discretize_state(float(next_obs[0]), float(next_obs[1]))
-                    next_state = (next_cpu_state, next_ram_state)
-                    update_q_value(Q, (cpu_state, ram_state), action, reward, (next_cpu_state, next_ram_state))
-                    iteration += 1
-                    # Log Q-values
-                    print(f"Iteration: {iteration}, Q-values: \n{Q}")
-
                     # Log rewards
                     print(f"Iteration: {iteration}, Reward: {reward}")
                     # Calculate MSE and store in list
@@ -237,6 +273,56 @@ if __name__ == "__main__":
                     mse = calculate_mse(Q, target_values) # Calculate MSE
                     mse_values.append(mse)
 
+                    if iteration % 100 == 0:  # Save plot every 100 iterations
+                        print("Plotting...")
+                        plot_values(range(1, iteration+1, 10), mse_values[::10], save_path)
+                
+            else:  # If CPU and RAM do not exceed thresholds
+                # Check if CPU and RAM values are not None
+                if cpu_value is not None and ram_value is not None:
+                    print(f"Metrics: |CPU:{str(cpu_value)}% |RAM:{str(ram_value)} % |Time running:{str(time_running)}s")  # Print metrics
+                    # Discretize states
+                    cpu_state, ram_state = discretize_state(float(cpu_value), float(ram_value))
+                    if Run_using_fuzzy is not True:
+                        # Select an action based on your Q-learning logic
+                        action = select_action(Q, cpu_state, ram_state)
+                    if Run_using_fuzzy:
+                        # Fuzzy Inference
+                        rule1 = fuzz.relation_min(cpu_high[:, np.newaxis], ram_high[:, np.newaxis])
+                        action_scale_out = np.array([1, 0])
+                        action_activation_scale_out = np.fmin(rule1[:, :, np.newaxis], action_scale_out)
+                        rule2 = np.fmax(cpu_low[:, np.newaxis], ram_low[:, np.newaxis])
+                        action_scale_in = np.array([0, 1])
+                        action_activation_scale_in = np.fmin(rule2[:, :, np.newaxis], action_scale_in)
+                        aggregated = np.fmax(action_activation_scale_out, action_activation_scale_in)
+                        # Defuzzification
+                        universe_of_discourse = np.array([0, 1])
+                        max_index = np.unravel_index(np.argmax(aggregated), aggregated.shape)
+                        print(f"Max-Index = {max_index}")
+                        action_result = universe_of_discourse[max_index[1]]
+                        print(f"Action_result={action_result}")
+                        selected_action = int(round(action_result))
+                        print("Selected Action:", selected_action)
+                        if action_result >= 0.5:
+                            # Scale out action
+                            action = 0
+                        else:
+                            # Scale in action
+                            action = 1
+                    # Take a step in the environment
+                    next_obs, reward, done, _ = env.step(action)
+                    next_cpu_state, next_ram_state = discretize_state(float(next_obs[0]), float(next_obs[1]))
+                    next_state = (next_cpu_state, next_ram_state)
+                    update_q_value(Q, (cpu_state, ram_state), action, reward, (next_cpu_state, next_ram_state))
+                    iteration += 1  # Increment iteration count
+                    # Log Q-values
+                    print(f"Iteration: {iteration}, Q-values: \n{Q}")
+                    # Log rewards
+                    print(f"Iteration: {iteration}, Reward: {reward}")
+                    # Calculate MSE and store in list
+                    target_values = np.array([[cpu_state, ram_state]])  # Use the current state as target values
+                    mse = calculate_mse(Q, target_values) # Calculate MSE
+                    mse_values.append(mse)
                     if iteration % 10 == 0:  # Save plot every 50 iterations
                         print("Plotting...")
                         plot_values(range(1, iteration+1, 10), mse_values[::10], save_path)

@@ -3,3 +3,4 @@ docker
 numpy 
 matplotlib
 gym
+scikit-fuzzy

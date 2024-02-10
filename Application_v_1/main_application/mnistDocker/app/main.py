@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi import HTTPException
 from app.model.covnet import ConvNet
 from torch import optim
 import torch.nn as nn
@@ -48,10 +49,20 @@ async def train():
 
 @app.get("/test")
 async def test():
-
     model = ConvNet()
-    model.load_state_dict(torch.load("app/data/mnist_model.pt"))
-    model.eval()
-    total_predicted, accuracy = model.test(loaders['test'])
-    return {"test_accuracy": accuracy}
+    try:
+        state_dict = torch.load("app/data/mnist_model.pt")
+        model_state_dict = model.state_dict()
 
+        # Filter out unnecessary keys
+        state_dict = {k: v for k, v in state_dict.items() if k in model_state_dict}
+
+        # Load the state_dict
+        model.load_state_dict(state_dict, strict=False)
+
+        model.eval()
+        total_predicted, accuracy = model.test(loaders['test'])
+        return {"test_accuracy": accuracy}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading model: {e}")

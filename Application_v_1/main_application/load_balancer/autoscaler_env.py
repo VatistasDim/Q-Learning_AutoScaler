@@ -5,6 +5,7 @@ import prometheus_metrics
 import time, docker
 
 service_name = 'mystack_application'
+service_produce_load_name = 'mystack_produce-load'
 cooldownTimeInSec = 30
 
 client = docker.from_env()
@@ -168,8 +169,8 @@ def Calculate_Thresholds():
     """
     current_replicas = get_current_replica_count(service_name)
     if current_replicas is not None:
-        cpu_threshold = 1 + (current_replicas - 1) * 5 if current_replicas <= 10 else 99
-        ram_threshold = 10 + (current_replicas - 1) * 5 if current_replicas <= 10 else 99
+        cpu_threshold = 15 + (current_replicas - 1) * 4
+        ram_threshold = 15 + (current_replicas - 1) * 5 #if current_replicas <= 0 else 101
     else:
         cpu_threshold = 0  # Default value if replicas count is not available
         ram_threshold = 10  # Default value if replicas count is not available
@@ -198,16 +199,19 @@ class AutoscaleEnv(gym.Env):
     def reset(self):
         # Reset environment to initial state
         reset_replicas(service_name = service_name)  # Reset Env.
+        reset_replicas(service_name= service_produce_load_name)
         return self._get_observation()
 
     def step(self, action):
         # Take action and observe new state and reward
         if action == 0:  # scale_out
             scale_out_action(service_name=self.service_name, max_replicas=self.max_replicas)
+            # scale_out_action(service_name=service_produce_load_name, max_replicas=1)
             self.cpu_threshold, self.ram_threshold = Calculate_Thresholds()
             
         elif action == 1:  # scale_in
             scale_in_action(service_name=self.service_name, min_replicas=self.min_replicas)
+            # scale_in_action(service_name=service_produce_load_name, min_replicas=1)
             self.cpu_threshold, self.ram_threshold = Calculate_Thresholds()
         while True:
             tuple_data = fetch_data()
@@ -225,7 +229,6 @@ class AutoscaleEnv(gym.Env):
         while True:
             # Return the current CPU and RAM values as the observation
             tuple_data = fetch_data()
-            print(f"{tuple_data} in get_observation")
             # Check if data is not None and not empty
             if tuple_data is not None and any(ele is not None for ele in tuple_data):
                 cpu_value, ram_value, _ = tuple_data  # Implement your metric fetching logic here

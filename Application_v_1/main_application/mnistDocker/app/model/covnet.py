@@ -53,7 +53,15 @@ class ConvNet(nn.Module):
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2)
         )
-
+        self.conv4 = nn.Sequential(
+            nn.Conv2d(in_channels=32,
+                      out_channels=48,
+                      kernel_size=5,
+                      stride=1,
+                      padding=2),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2)
+        )
         self.fc = nn.Linear(32 * 7 * 7, 10)
 
     def forward(self, x):
@@ -111,4 +119,3 @@ class ConvNet(nn.Module):
 
         print(f'\nFinished Testing with accuracy={100 * (correct / total):.2f}')
         return total_predicted, accuracy
-
