@@ -1,6 +1,6 @@
-from flask import Flask, render_template, send_file
+from flask import Flask, render_template, send_file, jsonify
 from prometheus_client import start_http_server, Gauge
-import time, psutil, threading
+import time, psutil, threading, json
 
 cpu_usage_gauge = Gauge('cpu_usage', 'CPU_Usage')
 ram_usage_gauge = Gauge('ram_usage', 'Ram_Usage')
@@ -15,7 +15,6 @@ def update_metrics():
         cpu_usage_gauge.set(psutil.cpu_percent())
         ram_usage_gauge.set(psutil.virtual_memory().percent)
         running_time_gauge.set(int(elapsed_time))
-        print("Data Output:\n CPU OUTPUT: "+ str(cpu_usage_gauge)+" RAM OUTPUT: "+str(ram_usage_gauge))
         time.sleep(1)
 
 @app.route('/')
@@ -35,6 +34,18 @@ def streaming():
     video_path = 'static/video/video_1.mp4'
     return send_file(video_path, mimetype='video/mp4')
 
+@app.route('/json_endpoint', methods=['GET'])
+def json_endpoint():
+    file_path = 'json_data/data.json'
+    try:
+        with open(file_path, 'r') as file:
+            data = json.load(file)
+        return jsonify(data)
+    except FileNotFoundError:
+        return jsonify({'error': 'JSON file not found'}), 404
+    except json.JSONDecodeError:
+        return jsonify({'error': 'Error decoding JSON file'}), 500
+    
 if __name__ == '__main__':
     
     metric_update_thread = threading.Thread(target=update_metrics)
