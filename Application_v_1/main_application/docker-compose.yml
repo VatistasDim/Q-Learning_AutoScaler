@@ -24,13 +24,6 @@ services:
     depends_on:
       - create-requests
 
-  create-requests:
-    image: create-requests
-    depends_on:
-      - application
-    deploy:
-      replicas: 1
-
   grafana:
     image: grafana/grafana:latest
     ports:
