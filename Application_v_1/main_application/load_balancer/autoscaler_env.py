@@ -9,6 +9,7 @@ cooldownTimeInSec = 30
 
 client = docker.from_env()
 clients_list = client.services.list()
+
 def get_current_replica_count(service_prefix):
     """
     Gets the replicas number from Docker.
@@ -70,8 +71,8 @@ def scale_out_action(service_name, max_replicas):
         print(f"Horizontal Scale Out: Replicas increased to: {current_replicas}")  # Print scale out message
         scale_out(service_name, current_replicas)  # Increase replicas
     else:
-        print("Already at maximum replicas. Resetting replicas to 1")  # Indicate already at maximum replicas
-        reset_replicas(service_name=service_name)
+        print("Already at maximum replicas.")  # Indicate already at maximum replicas
+        #reset_replicas(service_name=service_name)
 
     return current_replicas
 
@@ -100,32 +101,42 @@ def scale_in(service_name, scale_out_factor):
     time.sleep(cooldownTimeInSec)
 
 def get_reward(cpu_value, ram_value, cpu_threshold, ram_threshold):
-    """
-    Calculates the reward based on CPU and RAM values.
-
-    Args:
-        cpu_value (float): The CPU value.
-        ram_value (float): The RAM value.
-        cpu_threshold (float): The CPU threshold.
-        ram_threshold (float): The RAM threshold.
-
-    Returns:
-        int: The calculated reward.
-    """
     if cpu_value is not None and ram_value is not None:
-        cpu_threshold_10_percent = cpu_value * 0.05
-        ram_threshold_10_percent = ram_value * 0.05
-        cpu_threshold_merged = cpu_threshold + cpu_threshold_10_percent
-        ram_threshold_merged = ram_threshold + ram_threshold_10_percent
-        print(f"CPU_Plus_10%: {cpu_threshold_merged} RAM_Plus_10%:{ram_threshold_merged}")
+        are_too_many_containers = False
+        close_to_achieve_reward = False
+        cpu_threshold_20_percent = cpu_value * 0.20
+        ram_threshold_20_percent = ram_value * 0.20
+        cpu_threshold_merged = cpu_threshold + int(cpu_threshold_20_percent)
+        ram_threshold_merged = ram_threshold + int(ram_threshold_20_percent)
+        print(f"CPU_Plus_20%: {cpu_threshold_merged} RAM_Plus_20%: {ram_threshold_merged}")
+
+        cpu_diff = cpu_threshold_merged - cpu_value
+        cpu_diff_low = cpu_value - cpu_threshold_merged
+        if cpu_diff >= 10:
+            are_too_many_containers = True
+        elif cpu_diff_low <= 15:
+            close_to_achieve_reward = True
+        
         if cpu_value <= cpu_threshold_merged and ram_value <= ram_threshold_merged:
             print(f"Reward={20}, cpu_value={cpu_value} <= {cpu_threshold_merged} and ram_value={ram_value} <= {ram_threshold_merged}")
             return 20
-        else:
-            print(f"Reward={-10}, cpu_value={cpu_value} >= {cpu_threshold_merged} and ram_value={ram_value} >= {ram_threshold_merged}")
+        elif close_to_achieve_reward:
+            if are_too_many_containers:
+                print(f"Reward {-10}: Caused by, Too many containers are running.")
+                return -10
+            print("Close to achieve reward!")
+            print(f"Reward{-5}, cpu_value={cpu_value} <= {cpu_threshold_merged} and ram_value={ram_value} <= {ram_threshold_merged}")
+            return -5
+        elif are_too_many_containers:
+            print(f"Reward {-10}: Caused by, Too many containers are running.")
             return -10
+        else:
+            print(f"Reward={-15}, cpu_value={cpu_value} >= {cpu_threshold_merged} or ram_value={ram_value} >= {ram_threshold_merged}")
+            return -15
     else:
+        print(f"Reward={0}: Caused by, There was an error when trying to calculate the reward function")
         return 0
+
 
 def fetch_data():
     """Fetching the data from the API
@@ -168,8 +179,8 @@ def Calculate_Thresholds():
     """
     current_replicas = get_current_replica_count(service_name)
     if current_replicas is not None:
-        cpu_threshold = 1 + (current_replicas - 1) * 5 if current_replicas <= 10 else 99
-        ram_threshold = 10 + (current_replicas - 1) * 5 if current_replicas <= 10 else 99
+        cpu_threshold = 1 + (current_replicas - 1) * 8 if current_replicas <= 10 else 100
+        ram_threshold = 10 + (current_replicas - 1) * 8 if current_replicas <= 10 else 100
     else:
         cpu_threshold = 0  # Default value if replicas count is not available
         ram_threshold = 10  # Default value if replicas count is not available
@@ -225,7 +236,6 @@ class AutoscaleEnv(gym.Env):
         while True:
             # Return the current CPU and RAM values as the observation
             tuple_data = fetch_data()
-            print(f"{tuple_data} in get_observation")
             # Check if data is not None and not empty
             if tuple_data is not None and any(ele is not None for ele in tuple_data):
                 cpu_value, ram_value, _ = tuple_data  # Implement your metric fetching logic here

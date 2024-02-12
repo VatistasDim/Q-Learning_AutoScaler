@@ -2,7 +2,6 @@ import numpy as np
 import random, logging
 import prometheus_metrics
 import matplotlib.pyplot as plt
-import time
 from datetime import datetime
 from autoscaler_env import AutoscaleEnv
 
@@ -14,8 +13,9 @@ ram_threshold = 10
 max_replicas = 10
 min_replicas = 1
 num_states = 2
-Q_file = "q_values.npy"
-Q = np.load(Q_file) if Q_file else np.zeros((num_states, num_states, 2))
+#Q_file = "q_values.npy"
+#Q = np.load(Q_file) if Q_file else np.zeros((num_states, num_states, 2))
+Q = np.zeros((num_states, num_states, 2))
 iteration = 1
 
 def discretize_state(cpu_value, ram_value):
@@ -49,7 +49,7 @@ def select_action(Q, cpu_state, ram_state):
     Returns:
         int: The selected action.
     """
-    epsilon = 0.1
+    epsilon = 0.4
     if random.uniform(0, 1) < epsilon:
         return random.choice([0, 1])
     else:
@@ -138,7 +138,7 @@ if __name__ == "__main__":
     rewards = []
     replicas_count = []
     save_path = '/plots' # Set the save path inside the container
-    validation_interval = 50 # Perform validation every 20 iterations
+    validation_interval = 101 # Perform validation every 101 iterations
     env = AutoscaleEnv(service_name, min_replicas, max_replicas, cpu_threshold, ram_threshold, num_states)
     obs = env.reset()
     for iteration in range(1, train_steps):  # Run iterations
