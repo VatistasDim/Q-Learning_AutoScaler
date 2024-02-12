@@ -1,4 +1,16 @@
-import gym, time
+"""
+Autoscaling Environment
+
+This script provides an environment for autoscaling a Docker service using OpenAI Gym. The environment includes actions for scaling in and scaling out, and calculates rewards based on CPU and RAM metrics.
+
+Usage:
+- Instantiate the AutoscaleEnv class with the required parameters.
+- Use the reset() method to initialize the environment.
+- Use the step(action) method to take an action (0 for scale_out, 1 for scale_in) and observe the new state, reward, and whether the environment is done.
+"""
+
+import gym
+import time
 from gym import spaces
 import numpy as np
 import prometheus_metrics
@@ -13,11 +25,12 @@ clients_list = client.services.list()
 def get_current_replica_count(service_prefix):
     """
     Gets the replicas number from Docker.
+
     Args:
-        service_prefix (_type_): _description_
+        service_prefix (str): The prefix of the service name.
 
     Returns:
-        _type_: _description_
+        int or None: The number of replicas if found, otherwise None.
     """
     client = docker.from_env()
     try:
@@ -37,18 +50,17 @@ def scale_in_action(service_name, min_replicas):
         min_replicas (int): Minimum number of replicas allowed.
 
     Returns:
-        tuple: Tuple containing the updated rewards list and the new replica count.
+        int or None: The new replica count after scaling in, or None if scaling is not possible.
     """
-    #tuple_data = fetch_data() # Fetch new data
-    current_replicas = get_current_replica_count(service_name)  # Get current replica count
-    if current_replicas is not None and current_replicas > min_replicas:  # If current replicas is not None and greater than min replicas
-        current_replicas = current_replicas - 1
-        print(f"Horizontal Scale In: Replicas decreased to: {current_replicas}, system waits 5 seconds")  # Print scale in message
-        scale_in(service_name, 1)  # Decrease replicas
+    current_replicas = get_current_replica_count(service_name)
+    if current_replicas is not None and current_replicas > min_replicas:
+        current_replicas -= 1
+        print(f"Horizontal Scale In: Replicas decreased to: {current_replicas}, system waits 5 seconds")
+        scale_in(service_name, 1)
+        return current_replicas
     else:
-        print(f"Already at minimum replicas: {min_replicas}")  # Indicate already at minimum replicas
-
-    return current_replicas
+        print(f"Already at minimum replicas: {min_replicas}")
+        return None
 
 def scale_out_action(service_name, max_replicas):
     """
@@ -57,15 +69,11 @@ def scale_out_action(service_name, max_replicas):
     Args:
         service_name (str): Name of the service to scale.
         max_replicas (int): Maximum number of replicas allowed.
-        rewards (list): List to store rewards.
 
     Returns:
-        tuple: Tuple containing the updated rewards list and the new replica count.
+        int or None: The new replica count after scaling out, or None if scaling is not possible.
     """
-    # Get current replica count
     current_replicas = get_current_replica_count(service_name)
-    
-    # If current replicas is not None and less than max replicas
     if current_replicas is not None and current_replicas < max_replicas:
         current_replicas = current_replicas + 1
         print(f"Horizontal Scale Out: Replicas increased to: {current_replicas}")  # Print scale out message
@@ -89,9 +97,10 @@ def scale_out(service_name, desired_replicas):
 def scale_in(service_name, scale_out_factor):
     """
     Scales in a service to the specified number of replicas.
+
     Args:
-        service_name (_type_): _description_
-        scale_out_factor (_type_): _description_
+        service_name (str): Name of the service to scale.
+        scale_out_factor (int): The number of replicas to scale in by.
     """
     client = docker.from_env()
     service = client.services.get(service_name)
@@ -101,6 +110,18 @@ def scale_in(service_name, scale_out_factor):
     time.sleep(cooldownTimeInSec)
 
 def get_reward(cpu_value, ram_value, cpu_threshold, ram_threshold):
+    """
+    Calculates the reward based on CPU and RAM metrics.
+
+    Args:
+        cpu_value (int): Current CPU utilization percentage.
+        ram_value (int): Current RAM utilization percentage.
+        cpu_threshold (int): CPU threshold for autoscaling.
+        ram_threshold (int): RAM threshold for autoscaling.
+
+    Returns:
+        int: The calculated reward.
+    """
     if cpu_value is not None and ram_value is not None:
         are_too_many_containers = False
         close_to_achieve_reward = False
@@ -137,12 +158,12 @@ def get_reward(cpu_value, ram_value, cpu_threshold, ram_threshold):
         print(f"Reward={0}: Caused by, There was an error when trying to calculate the reward function")
         return 0
 
-
 def fetch_data():
-    """Fetching the data from the API
+    """
+    Fetches data from the Prometheus metrics API.
 
     Returns:
-        _type_: cpu_percent(int), ram_percent(int), time_up(int) or None for all.
+        tuple: A tuple containing CPU percent, RAM percent, and uptime, or None if there is an error.
     """
     try:
         metrics = prometheus_metrics.start_metrics_service(url=url)
@@ -160,9 +181,10 @@ def fetch_data():
 
 def reset_replicas(service_name):
     """
-    Reset the service to one replica.
+    Resets the service to one replica.
+
     Args:
-        service_name (_type_): _description_
+        service_name (str): Name of the service to reset.
     """
     client = docker.from_env()
     service = client.services.get(service_name)
@@ -172,7 +194,7 @@ def reset_replicas(service_name):
 
 def Calculate_Thresholds():
     """
-    Calculates the CPU and RAM thresholds.
+    Calculates the CPU and RAM thresholds based on the current number of replicas.
 
     Returns:
         tuple: A tuple containing the CPU and RAM thresholds.
@@ -191,6 +213,21 @@ def Calculate_Thresholds():
 url = 'http://prometheus:9090/api/v1/query'
 
 class AutoscaleEnv(gym.Env):
+    """
+    Autoscaling Environment class for OpenAI Gym.
+
+    Attributes:
+        service_name (str): Name of the Docker service.
+        min_replicas (int): Minimum number of replicas allowed.
+        max_replicas (int): Maximum number of replicas allowed.
+        cpu_threshold (int): CPU threshold for autoscaling.
+        ram_threshold (int): RAM threshold for autoscaling.
+        num_states (int): Number of states in the observation space.
+        max_time_minutes (int): Maximum time in minutes for the episode.
+        start_time (float): Start time of the episode.
+        action_space (gym.Space): Action space for the environment.
+        observation_space (gym.Space): Observation space for the environment.
+    """
     def __init__(self, service_name, min_replicas, max_replicas, cpu_threshold, ram_threshold, num_states, max_time_minutes=10):
         super(AutoscaleEnv, self).__init__()
 
@@ -207,12 +244,25 @@ class AutoscaleEnv(gym.Env):
         self.observation_space = spaces.Box(low=0, high=np.inf, shape=(2,), dtype=np.float32)  # (CPU, RAM)
 
     def reset(self):
-        # Reset environment to initial state
-        reset_replicas(service_name = service_name)  # Reset Env.
+        """
+        Reset environment to initial state.
+
+        Returns:
+            np.array: Initial observation.
+        """
+        reset_replicas(service_name=self.service_name)  # Reset Env.
         return self._get_observation()
 
     def step(self, action):
-        # Take action and observe new state and reward
+        """
+        Take action and observe new state and reward.
+
+        Args:
+            action (int): Action to take (0 for scale_out, 1 for scale_in).
+
+        Returns:
+            tuple: Tuple containing the new state, reward, whether the episode is done, and additional info.
+        """
         if action == 0:  # scale_out
             scale_out_action(service_name=self.service_name, max_replicas=self.max_replicas)
             self.cpu_threshold, self.ram_threshold = Calculate_Thresholds()
@@ -220,6 +270,7 @@ class AutoscaleEnv(gym.Env):
         elif action == 1:  # scale_in
             scale_in_action(service_name=self.service_name, min_replicas=self.min_replicas)
             self.cpu_threshold, self.ram_threshold = Calculate_Thresholds()
+        
         while True:
             tuple_data = fetch_data()
             has_data = all(ele is None for ele in tuple_data)
@@ -233,8 +284,13 @@ class AutoscaleEnv(gym.Env):
             time.sleep(cooldownTimeInSec)
 
     def _get_observation(self):
+        """
+        Return the current CPU and RAM values as the observation.
+
+        Returns:
+            np.array: Current observation.
+        """
         while True:
-            # Return the current CPU and RAM values as the observation
             tuple_data = fetch_data()
             # Check if data is not None and not empty
             if tuple_data is not None and any(ele is not None for ele in tuple_data):
@@ -245,5 +301,11 @@ class AutoscaleEnv(gym.Env):
             time.sleep(cooldownTimeInSec)  # Adjust the duration based on your requirements
 
     def _is_done(self):
+        """
+        Check if the episode is done based on elapsed time.
+
+        Returns:
+            bool: True if the episode is done, False otherwise.
+        """
         elapsed_time_minutes = (time.time() - self.start_time) / 60.0
         return elapsed_time_minutes >= self.max_time_minutes

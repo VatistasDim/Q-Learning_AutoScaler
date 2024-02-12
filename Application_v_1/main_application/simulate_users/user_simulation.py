@@ -1,3 +1,23 @@
+"""
+User Simulation Script
+
+This script simulates user behavior by making HTTP requests to a specified endpoint at regular intervals.
+It uses the requests library for HTTP communication and concurrent.futures for parallel execution of user simulations.
+
+Constants:
+- BASE_URL: The base URL of the endpoint to be accessed (http://[YOUR_IP_OF_APPLICATION_RUNNING_ON_WORKER]:8082/json_endpoint).
+
+Functions:
+- simulate_user(user_id, request_interval=1): Simulates a single user by making HTTP requests at a specified interval.
+- run_simulation(num_users, interval, request_interval=1): Runs the overall simulation with multiple users and periodic restarts.
+
+Usage:
+- Set environment variables NUM_USERS, INTERVAL, and REQUEST_INTERVAL to configure the simulation parameters.
+- NUM_USERS: Number of users (default is 10, capped at a maximum of 1000).
+- INTERVAL: Time interval in minutes for periodic restarts of users (default is 1 minute).
+- REQUEST_INTERVAL: Time interval in seconds between consecutive HTTP requests by each user (default is 1 second).
+"""
+
 import requests
 import concurrent.futures
 import time
@@ -6,6 +26,16 @@ import os
 BASE_URL = 'http://localhost:8082/json_endpoint'
 
 def simulate_user(user_id, request_interval=1):
+    """
+    Simulates a single user by making HTTP requests at a specified interval.
+
+    Args:
+        user_id (int): The identifier for the simulated user.
+        request_interval (int): Time interval in seconds between consecutive HTTP requests.
+
+    Returns:
+        None
+    """
     while True:
         try:
             response = requests.get(BASE_URL)
@@ -15,6 +45,17 @@ def simulate_user(user_id, request_interval=1):
             print(f"User {user_id} - Error: {e}")
 
 def run_simulation(num_users, interval, request_interval=1):
+    """
+    Runs the overall simulation with multiple users and periodic restarts.
+
+    Args:
+        num_users (int): Number of users to simulate (capped at a maximum of 1000).
+        interval (int): Time interval in minutes for periodic restarts of users.
+        request_interval (int): Time interval in seconds between consecutive HTTP requests.
+
+    Returns:
+        None
+    """
     with concurrent.futures.ThreadPoolExecutor(max_workers=num_users) as executor:
         user_ids = range(1, num_users + 1)
 

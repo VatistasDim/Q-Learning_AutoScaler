@@ -1,3 +1,35 @@
+"""
+Autoscaler Control Script
+
+This script implements a control loop that monitors CPU and RAM metrics, takes certain actions based on thresholds and conditions,
+and updates a Q-value. It also handles scaling operations based on the current state and actions.
+
+Constants:
+- url: Prometheus URL for metric retrieval.
+- service_name: The name of the observable service.
+- application_url: URL for application training.
+- cpu_threshold: CPU threshold for scaling operations.
+- ram_threshold: RAM threshold for scaling operations.
+- max_replicas: Maximum number of replicas.
+- min_replicas: Minimum number of replicas.
+- num_states: Number of discretized states.
+- Q: Q-value array for Q-learning.
+- iteration: Current iteration count.
+
+Functions:
+- discretize_state(cpu_value, ram_value): Discretizes CPU and RAM values.
+- select_action(Q, cpu_state, ram_state): Selects an action based on the given state.
+- update_q_value(Q, state, action, reward, next_state): Updates the Q-value based on the given state, action, reward, and next state.
+- fetch_data(): Fetches CPU, RAM, and running time metrics from Prometheus.
+- calculate_mse(Q, target_values): Calculates Mean Squared Error (MSE).
+- plot_values(iterations, mse_values, save_path): Plots MSE over iterations.
+
+Usage:
+- Set the necessary constants for metric retrieval, service details, thresholds, and Q-learning.
+- Configure the training steps, save path, and validation interval.
+- Run the script to perform Q-learning-based autoscaling.
+"""
+
 import numpy as np
 import random, logging
 import prometheus_metrics
