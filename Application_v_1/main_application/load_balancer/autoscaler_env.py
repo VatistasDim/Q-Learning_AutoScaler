@@ -15,10 +15,17 @@ from gym import spaces
 import numpy as np
 import prometheus_metrics
 import time, docker
+from discretizer import Discretizer
+from costs import Costs
 
 service_name = 'mystack_application'
 cooldownTimeInSec = 30
-
+w_adp = 0.3
+w_perf = 0.5
+w_res = 0.4
+c_res = 0.5
+K_max = 10
+Rmax = 1
 client = docker.from_env()
 clients_list = client.services.list()
 
@@ -109,54 +116,6 @@ def scale_in(service_name, scale_out_factor):
     service.scale(desired_replicas)
     time.sleep(cooldownTimeInSec)
 
-def get_reward(cpu_value, ram_value, cpu_threshold, ram_threshold):
-    """
-    Calculates the reward based on CPU and RAM metrics.
-
-    Args:
-        cpu_value (int): Current CPU utilization percentage.
-        ram_value (int): Current RAM utilization percentage.
-        cpu_threshold (int): CPU threshold for autoscaling.
-        ram_threshold (int): RAM threshold for autoscaling.
-
-    Returns:
-        int: The calculated reward.
-    """
-    if cpu_value is not None and ram_value is not None:
-        are_too_many_containers = False
-        close_to_achieve_reward = False
-        cpu_threshold_20_percent = cpu_value * 0.20
-        ram_threshold_20_percent = ram_value * 0.20
-        cpu_threshold_merged = cpu_threshold + int(cpu_threshold_20_percent)
-        ram_threshold_merged = ram_threshold + int(ram_threshold_20_percent)
-        print(f"CPU_Plus_20%: {cpu_threshold_merged} RAM_Plus_20%: {ram_threshold_merged}")
-
-        cpu_diff = cpu_threshold_merged - cpu_value
-        cpu_diff_low = cpu_value - cpu_threshold_merged
-        if cpu_diff >= 10:
-            are_too_many_containers = True
-        elif cpu_diff_low <= 15:
-            close_to_achieve_reward = True
-        
-        if cpu_value <= cpu_threshold_merged and ram_value <= ram_threshold_merged:
-            print(f"Reward={20}, cpu_value={cpu_value} <= {cpu_threshold_merged} and ram_value={ram_value} <= {ram_threshold_merged}")
-            return 20
-        elif close_to_achieve_reward:
-            if are_too_many_containers:
-                print(f"Reward {-10}: Caused by, Too many containers are running.")
-                return -10
-            print("Close to achieve reward!")
-            print(f"Reward{-5}, cpu_value={cpu_value} <= {cpu_threshold_merged} and ram_value={ram_value} <= {ram_threshold_merged}")
-            return -5
-        elif are_too_many_containers:
-            print(f"Reward {-10}: Caused by, Too many containers are running.")
-            return -10
-        else:
-            print(f"Reward={-15}, cpu_value={cpu_value} >= {cpu_threshold_merged} or ram_value={ram_value} >= {ram_threshold_merged}")
-            return -15
-    else:
-        print(f"Reward={0}: Caused by, There was an error when trying to calculate the reward function")
-        return 0
 
 def fetch_data():
     """
@@ -173,7 +132,8 @@ def fetch_data():
                 cpu_percent = int(float(metrics[0]))
                 ram_percent = int(float(metrics[1]))
                 time_up = int(float(time_up))
-                return cpu_percent, ram_percent, time_up
+                response_time = int(float(metrics[3]))
+                return cpu_percent, ram_percent, time_up, response_time
         return None, None, None
     except Exception as e:
         print("An error occurred during service metrics retrieval:", e)
@@ -192,23 +152,15 @@ def reset_replicas(service_name):
     service.scale(desired_replicas)
     time.sleep(cooldownTimeInSec)
 
-def Calculate_Thresholds():
-    """
-    Calculates the CPU and RAM thresholds based on the current number of replicas.
-
-    Returns:
-        tuple: A tuple containing the CPU and RAM thresholds.
-    """
-    current_replicas = get_current_replica_count(service_name)
-    if current_replicas is not None:
-        cpu_threshold = 1 + (current_replicas - 1) * 8 if current_replicas <= 10 else 100
-        ram_threshold = 10 + (current_replicas - 1) * 8 if current_replicas <= 10 else 100
-    else:
-        cpu_threshold = 0  # Default value if replicas count is not available
-        ram_threshold = 10  # Default value if replicas count is not available
-
-    print(f"Thresholds calculated as CPU:{cpu_threshold}, RAM: {ram_threshold}")
-    return cpu_threshold, ram_threshold
+def Calculate_total_cost(w_adp, w_perf, w_res, max_replicas, action, num_containers, cpu_shares, response_time):
+    adaptation_cost = Costs.calculate_adaptation_cost(w_adp, action=action)
+    performance_penalty = Costs.calculate_performance_penalty(response_time, w_perf, Rmax)
+    resource_cost = Costs.calculate_resource_cost(w_res, num_containers, cpu_shares, max_replicas, c_res)
+    print(f'w_adp={w_adp}, adaptation_cost={adaptation_cost}, w_perf={w_perf}, perfomance_penaly={performance_penalty}, w_res{w_res}, resource_cost:{resource_cost}')
+    total_cost = w_adp * adaptation_cost + w_perf * performance_penalty + w_res * resource_cost
+    if total_cost != 0:
+        total_cost = round(total_cost, 4)
+    return total_cost
 
 url = 'http://prometheus:9090/api/v1/query'
 
@@ -228,20 +180,18 @@ class AutoscaleEnv(gym.Env):
         action_space (gym.Space): Action space for the environment.
         observation_space (gym.Space): Observation space for the environment.
     """
-    def __init__(self, service_name, min_replicas, max_replicas, cpu_threshold, ram_threshold, num_states, max_time_minutes=10):
+    def __init__(self, service_name, min_replicas, max_replicas, num_states, max_time_minutes=10):
         super(AutoscaleEnv, self).__init__()
 
         self.service_name = service_name
         self.min_replicas = min_replicas
         self.max_replicas = max_replicas
-        self.cpu_threshold = cpu_threshold
-        self.ram_threshold = ram_threshold
         self.num_states = num_states
         self.max_time_minutes = max_time_minutes
         self.start_time = time.time()
 
-        self.action_space = spaces.Discrete(2)  # 2 actions: 0 (scale_out) and 1 (scale_in)
-        self.observation_space = spaces.Box(low=0, high=np.inf, shape=(2,), dtype=np.float32)  # (CPU, RAM)
+        self.action_space = spaces.Discrete(3)  # 3 actions: 0 (scale_out) and 1 (scale_in) and 2 (do nothing)
+        #self.observation_space = spaces.Box(low=0, high=np.inf, shape=(2,), dtype=np.float32)  # (CPU, RAM)
 
     def reset(self):
         """
@@ -265,40 +215,52 @@ class AutoscaleEnv(gym.Env):
         """
         if action == 0:  # scale_out
             scale_out_action(service_name=self.service_name, max_replicas=self.max_replicas)
-            self.cpu_threshold, self.ram_threshold = Calculate_Thresholds()
+            # new_cpu_shares_after_action = self.docker_api.get_stack_containers_mean_cpu_shares()
+            # print(f'cpu_shares:{new_cpu_shares_after_action}')
             
         elif action == 1:  # scale_in
             scale_in_action(service_name=self.service_name, min_replicas=self.min_replicas)
-            self.cpu_threshold, self.ram_threshold = Calculate_Thresholds()
+            # new_cpu_shares_after_action = self.docker_api.get_stack_containers_mean_cpu_shares()
+            # print(f'cpu_shares:{new_cpu_shares_after_action}')
+            
+        elif action == 2: # do_nothing
+            #new_cpu_shares_after_action = self.docker_api.get_stack_containers_mean_cpu_shares()
+            print(f'Do nothing')
         
         while True:
             tuple_data = fetch_data()
             has_data = all(ele is None for ele in tuple_data)
             if not has_data:
-                cpu_value, ram_value, _ = tuple_data
-                reward = get_reward(cpu_value, ram_value, self.cpu_threshold, self.ram_threshold)
-
-                next_state = self._get_observation()
-
-                return next_state, reward, self._is_done(), {}
+                cpu_shares, _, _, response_time= tuple_data
+                print(f'response_time:{response_time}')
+                number_of_containers = get_current_replica_count(service_name)
+                discretized_num_containers = Discretizer.discretize_num_containers(number_of_containers, 10, num_states=self.num_states)
+                discretized_cpu_share = Discretizer.discretize_stack_containers_cpu_shares(cpu_shares, 100, self.num_states)
+                reward = Calculate_total_cost(w_adp=w_adp,
+                                              w_perf=w_perf,
+                                              w_res=w_res,
+                                              max_replicas=10,
+                                              action=(action,),
+                                              num_containers=discretized_num_containers,
+                                              cpu_shares=discretized_cpu_share,
+                                              response_time=response_time)
+                current_state = self._get_observation()
+                return current_state, reward, self._is_done(), {}
             time.sleep(cooldownTimeInSec)
-
-    def _get_observation(self):
-        """
-        Return the current CPU and RAM values as the observation.
-
-        Returns:
-            np.array: Current observation.
-        """
-        while True:
-            tuple_data = fetch_data()
-            # Check if data is not None and not empty
-            if tuple_data is not None and any(ele is not None for ele in tuple_data):
-                cpu_value, ram_value, _ = tuple_data  # Implement your metric fetching logic here
-                return np.array([cpu_value, ram_value], dtype=np.float32)
             
-            # If data is None or empty, wait for a short duration before trying again
-            time.sleep(cooldownTimeInSec)  # Adjust the duration based on your requirements
+    def _get_observation(self):
+            max_num_containers = 10
+            max_cpu_shares = 100
+            while True:
+                tuple_data = fetch_data()
+                if tuple_data is not None and any(ele is not None for ele in tuple_data):
+                    cpu_value, _, _ ,_= tuple_data
+                    num_containers = get_current_replica_count(self.service_name)
+                    discretized_num_containers = Discretizer.discretize_num_containers(num_containers, max_num_containers, num_states=self.num_states)
+                    discretized_cpu_share = Discretizer.discretize_stack_containers_cpu_shares(cpu_value, max_cpu_shares, self.num_states)
+                    return discretized_num_containers, float(cpu_value), discretized_cpu_share
+                time.sleep(cooldownTimeInSec)
+
 
     def _is_done(self):
         """

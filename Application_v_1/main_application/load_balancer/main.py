@@ -40,17 +40,18 @@ from autoscaler_env import AutoscaleEnv
 url = 'http://prometheus:9090/api/v1/query'
 service_name = 'mystack_application'
 application_url = 'http://application:8501/train'
-cpu_threshold = 8
-ram_threshold = 10
 max_replicas = 10
 min_replicas = 1
-num_states = 2
+max_cpu_shares = 100
+num_states = 3
+w_perf = 0.5 # represents the weight assigned to the performance penalty term in the cost function
+w_res = 0.4 # w_perf, it's a constant value that determines the importance or impact of the resource cost in the overall cost calculation.
 #Q_file = "q_values.npy"
 #Q = np.load(Q_file) if Q_file else np.zeros((num_states, num_states, 2))
-Q = np.zeros((num_states, num_states, 2))
+Q = np.zeros((num_states, num_states, 3))
 iteration = 1
 
-def discretize_state(cpu_value, ram_value):
+def discretize_state(cpu_value):
     """
     Discretizes CPU and RAM values.
 
@@ -62,34 +63,26 @@ def discretize_state(cpu_value, ram_value):
         tuple: A tuple containing the discretized CPU and RAM states.
     """
     cpu_state = int(cpu_value)
-    ram_state = int(ram_value)
     
     cpu_state = max(0, min(cpu_state, num_states - 1))
-    ram_state = max(0, min(ram_state, num_states - 1))
 
-    return cpu_state, ram_state
+    return cpu_state
 
-def select_action(Q, cpu_state, ram_state):
-    """
-    Selects an action based on the given state.
-
-    Args:
-        Q (numpy.ndarray): The Q-values.
-        cpu_state (int): The CPU state.
-        ram_state (int): The RAM state.
-
-    Returns:
-        int: The selected action.
-    """
+def select_action(Q, observation):
     epsilon = 0.4
-    if random.uniform(0, 1) < epsilon:
-        return random.choice([0, 1])
-    else:
-        cpu_state = min(max(cpu_state, 0), num_states - 1)
-        ram_state = min(max(ram_state, 0), num_states - 1)
-        return np.argmax(Q[cpu_state, ram_state, :])
+    discretized_num_containers, cpu_value, discretized_cpu_share = observation
 
-def update_q_value(Q, state, action, reward, next_state):
+    if random.uniform(0, 1) < epsilon:
+        return random.choice([0, 1, 2])
+    else:
+        # Discretize the continuous values to use them as indices in the Q-table
+        cpu_state = min(max(discretized_num_containers, 0), num_states - 1)
+        cpu_value_state = min(max(discretize_state(cpu_value), 0), num_states - 1)
+        # Choose the action with the highest Q-value
+        return np.argmax(Q[cpu_state, cpu_value_state, discretized_cpu_share])
+
+
+def update_q_value(Q, state, action, reward, next_state, num_states):
     """
     Updates the Q-value based on the given state, action, reward, and next state.
 
@@ -99,14 +92,31 @@ def update_q_value(Q, state, action, reward, next_state):
         action (int): The selected action.
         reward (int): The reward received for the action.
         next_state (tuple): A tuple representing the next state.
+        num_states (int): Number of discretized states.
     """
-    alpha = 0.6
-    gamma = 0.5
-        
-    Q[state[0], state[1], action] = Q[state[0], state[1], action] + alpha * (
-        reward + gamma * np.max(Q[next_state[0], next_state[1], :]) - Q[state[0], state[1], action]
-    )
+    alpha = 0.2
+    gamma = 0.1
 
+    # Discretize the current state
+    cpu_state, cpu_value, _ = state
+    cpu_state = min(max(cpu_state, 0), num_states - 1)
+    cpu_value_state = discretize_state(cpu_value)
+    state = (cpu_state, cpu_value_state)
+
+    # Discretize the next state
+    next_cpu_state, next_cpu_value, _ = next_state
+    next_cpu_state = min(max(next_cpu_state, 0), num_states - 1)
+    next_cpu_value_state = discretize_state(next_cpu_value)
+    next_state = (next_cpu_state, next_cpu_value_state)
+
+    # Update Q-value based on the action
+    if action == 2:
+        Q[state[0], state[1], action] = Q[state[0], state[1], action] + alpha * (reward - Q[state[0], state[1], action])
+    else:
+        Q[state[0], state[1], action] = Q[state[0], state[1], action] + alpha * (
+            reward + gamma * np.max(Q[next_state[0], next_state[1], :]) - Q[state[0], state[1], action]
+        )
+        
 def fetch_data():
     """Fetching the data from the API
 
@@ -141,18 +151,11 @@ def calculate_mse(Q, target_values):
     mse = ((Q - target_values)**2).mean()
     return mse
 
-def plot_values(iterations, mse_values, save_path):
-    """
-    Plots Mean Squared Error (MSE) over iterations.
-    
-    Args:
-        iterations (list): List of iteration numbers.
-        mse_values (list): List of MSE values.
-    """
-    plt.figure(figsize=(10, 5))
+def plot_mse_values(iterations, mse_values, save_path):
     plt.plot(iterations, mse_values, label='MSE')
     plt.xlabel('Iterations')
-    plt.ylabel('MSE')
+    plt.ylabel('MSE Value')
+    plt.title('MSE Over Iterations')
     plt.legend()
     plt.savefig(f'{save_path}/mse_plot_iteration_{iteration}.png')
     
@@ -171,107 +174,43 @@ if __name__ == "__main__":
     replicas_count = []
     save_path = '/plots' # Set the save path inside the container
     validation_interval = 101 # Perform validation every 101 iterations
-    env = AutoscaleEnv(service_name, min_replicas, max_replicas, cpu_threshold, ram_threshold, num_states)
+    env = AutoscaleEnv(service_name, min_replicas, max_replicas, num_states)
     obs = env.reset()
     for iteration in range(1, train_steps):  # Run iterations
+        
         logger = logging.getLogger(__name__)  # Initialize a logger
         print(f"\n--------Iteration No:{iteration}")  # Print the current iteration number
-        logger.setLevel(logging.DEBUG)  # Set the logger level to debug
-        handler = logging.StreamHandler()  # Create a stream handler for the logger
-        cpu_value, ram_value, time_running = fetch_data()  # Get CPU, RAM values and a placeholder value
+        cpu_value, _, time_running = fetch_data()  # Get CPU, RAM values and a placeholder value
+        print(f"Metrics: |CPU:{str(cpu_value)}% |Time running:{str(time_running)}s")  # Print metrics
         
-        # Validation and Evaluation
-        if iteration % validation_interval == 0:
-            print("\n------Validation phase starts. Please wait until Validation Phase stop")
-            validation_rewards = []
-            for _ in range(10):  # Run 10 validation episodes
-                # Use the validation environment (not the training environment)
-                validation_obs = env.reset()
-                validation_reward = 0
-                while True:
-                    validation_action = select_action(Q, *discretize_state(*validation_obs))
-                    validation_next_obs, validation_reward, validation_done, _ = env.step(validation_action)
-                    
-                    validation_obs = validation_next_obs
-                    if validation_done:
-                        break
-
-                validation_rewards.append(validation_reward)
-
-            avg_validation_reward = np.mean(validation_rewards)
-            print(f"\nValidation Iteration: {iteration}, Avg. Validation Reward: {avg_validation_reward}\n Validation phase complete")
+        #Observe current state
+        observation = env._get_observation()
         
-        # Check if CPU and RAM values are not None
-        if cpu_value is not None and ram_value is not None:
-            # cpu_value
-            print(f"Metrics: |CPU:{str(cpu_value)}% |RAM:{str(ram_value)} % |Time running:{str(time_running)}s")  # Print metrics
-            
-            # Check if CPU or RAM exceed thresholds
-            if cpu_threshold < cpu_value or ram_threshold < ram_value:
-                # Check if CPU and RAM values are not None
-                if cpu_value is not None and ram_value is not None:
-                    
-                    # Discretize states
-                    cpu_state, ram_state = discretize_state(float(cpu_value), float(ram_value))
-
-                    # Select an action based on your Q-learning logic
-                    action = select_action(Q, cpu_state, ram_state)
-
-                    # Take a step in the environment
-                    next_obs, reward, done, _ = env.step(action)
-
-                    next_cpu_state, next_ram_state = discretize_state(float(next_obs[0]), float(next_obs[1]))
-                    next_state = (next_cpu_state, next_ram_state)
-                    update_q_value(Q, (cpu_state, ram_state), action, reward, (next_cpu_state, next_ram_state))
-                    
-                    iteration += 1  # Increment iteration count
-                    # Log Q-values
-                    print(f"Iteration: {iteration}, Q-values: \n{Q}")
-
-                    # Log rewards
-                    # print(f"Iteration: {iteration}, Reward: {reward}")
-                    
-                    # Calculate MSE and store in list
-                    target_values = np.array([[cpu_state, ram_state]])  # Use the current state as target values
-                    mse = calculate_mse(Q, target_values) # Calculate MSE
-                    mse_values.append(mse)
-
-                    if iteration % 50 == 0:  # Save plot every 10 iterations
-                        print("Plotting...")
-                        plot_values(range(1, iteration+1, 10), mse_values[::10], save_path)
-                
-            else:  # If CPU and RAM do not exceed thresholds
-                # Check if CPU and RAM values are not None
-                if cpu_value is not None and ram_value is not None:
-                    print(f"Metrics: |CPU:{str(cpu_value)}% |RAM:{str(ram_value)} % |Time running:{str(time_running)}s")  # Print metrics
-
-                    # Discretize states
-                    cpu_state, ram_state = discretize_state(float(cpu_value), float(ram_value))
-
-                    # Select an action based on your Q-learning logic
-                    action = select_action((cpu_state, ram_state), Q)
-
-                    # Take a step in the environment
-                    next_obs, reward, done, _ = env.step(action)
-
-                    # Update Q-values based on your Q-learning logic
-                    next_cpu_state, next_ram_state = discretize_state(float(next_obs[0]), float(next_obs[1]))
-                    next_state = (next_cpu_state, next_ram_state)
-                    update_q_value(Q, (cpu_state, ram_state), action, reward, (next_cpu_state, next_ram_state))
-                    iteration += 1
-                    # Log Q-values
-                    print(f"Iteration: {iteration}, Q-values: \n{Q}")
-
-                    # Log rewards
-                    print(f"Iteration: {iteration}, Reward: {reward}")
-                    # Calculate MSE and store in list
-                    target_values = np.array([[cpu_state, ram_state]])  # Use the current state as target values
-                    mse = calculate_mse(Q, target_values) # Calculate MSE
-                    mse_values.append(mse)
-
-                    if iteration % 10 == 0:  # Save plot every 50 iterations
-                        print("Plotting...")
-                        plot_values(range(1, iteration+1, 10), mse_values[::10], save_path)
-            np.save('/QSavedWeights/q_values.npy', Q)
-        else:  # If CPU or RAM values are None
-            print("No metrics available, wait...")  # Indicate no metrics available
+        # Take action based on observation
+        action = select_action(Q, observation)
+        
+        # Take a step in the environment
+        current_state, reward, done, _ = env.step(action)
+        
+        # Observe the next state after the action is taken
+        next_state = env._get_observation()
+        
+        # Update Q value based on action and next state
+        update_q_value(Q, current_state, action, reward, next_state, num_states=num_states)
+        
+        # Add one iteration
+        iteration += 1
+        
+        # Log Q-values & Log rewards
+        print(f"Reward: {reward}, Q-values: \n{Q}")
+        
+        # Calculate MSE and store in list
+        mse = calculate_mse(Q, observation)
+        mse_values.append(mse)
+        
+        if iteration % 50 == 0:  # Save plot every 50 iterations
+            print("Plotting...")
+            plot_mse_values(range(1, iteration - 1), mse_values, save_path)
+        np.save('/QSavedWeights/q_values.npy', Q)
+    else:  # If CPU or RAM values are None
+        print("No metrics available, wait...")  # Indicate no metrics available

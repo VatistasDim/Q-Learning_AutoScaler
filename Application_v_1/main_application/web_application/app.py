@@ -19,13 +19,15 @@ Routes:
 
 """
 
-from flask import Flask, render_template, send_file, jsonify
+from flask import Flask, render_template, send_file, jsonify, request
 from prometheus_client import start_http_server, Gauge
 import time, psutil, threading, json
+
 
 cpu_usage_gauge = Gauge('cpu_usage', 'CPU_Usage')
 ram_usage_gauge = Gauge('ram_usage', 'Ram_Usage')
 running_time_gauge = Gauge('running_time', 'Running Time')
+response_time_gauge = Gauge('response_time', 'Response Time')
 start_time = time.time()
 
 app = Flask(__name__)
@@ -45,6 +47,31 @@ def update_metrics():
         ram_usage_gauge.set(psutil.virtual_memory().percent)
         running_time_gauge.set(int(elapsed_time))
         time.sleep(1)
+
+@app.before_request
+def before_request():
+    """
+    Called before a request is processed. Captures the start time of the request.
+
+    Returns:
+        None
+    """
+    request.start_time = time.time()
+
+@app.after_request
+def after_request(response):
+    """
+    Called after a request is processed. Measures the response time and updates the metric.
+
+    Args:
+        response (flask.Response): The response object.
+
+    Returns:
+        flask.Response: The modified response object.
+    """
+    response_time = (time.time() - request.start_time) * 1000  # Convert to milliseconds
+    response_time_gauge.set(response_time)
+    return response
 
 @app.route('/')
 def home():
