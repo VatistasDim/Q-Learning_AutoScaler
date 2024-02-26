@@ -20,7 +20,7 @@ Routes:
 """
 
 from flask import Flask, render_template, send_file, jsonify, request
-from prometheus_client import start_http_server, Gauge
+from prometheus_client import start_http_server, Gauge, generate_latest
 import time, psutil, threading, json
 
 
@@ -69,8 +69,13 @@ def after_request(response):
     Returns:
         flask.Response: The modified response object.
     """
-    response_time = (time.time() - request.start_time) * 1000  # Convert to milliseconds
+    response_time = (time.time() - request.start_time)  # Elapsed time in seconds
     response_time_gauge.set(response_time)
+
+    # Generate latest Prometheus metrics and reset response_time_gauge to 0
+    generate_latest()
+    response_time_gauge.set(0)
+
     return response
 
 @app.route('/')
