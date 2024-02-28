@@ -20,27 +20,19 @@ Routes:
 """
 
 from flask import Flask, render_template, send_file, jsonify, request
-from prometheus_client import start_http_server, Gauge, generate_latest
+from prometheus_client import start_http_server, Gauge, generate_latest, CONTENT_TYPE_LATEST
 import time, psutil, threading, json
 
 
 cpu_usage_gauge = Gauge('cpu_usage', 'CPU_Usage')
 ram_usage_gauge = Gauge('ram_usage', 'Ram_Usage')
 running_time_gauge = Gauge('running_time', 'Running Time')
-response_time_gauge = Gauge('response_time', 'Response Time')
+json_endpoint_duration = Gauge('json_endpoint_duration_seconds', 'JSON Endpoint Duration in Seconds')
 start_time = time.time()
 
 app = Flask(__name__)
 
 def update_metrics():
-    """
-    Continuously updates Prometheus metrics for CPU usage, RAM usage, and running time.
-
-    This function runs in a separate thread and updates the metrics every second.
-
-    Returns:
-        None
-    """
     while True:
         elapsed_time = time.time() - start_time
         cpu_usage_gauge.set(psutil.cpu_percent())
@@ -48,35 +40,11 @@ def update_metrics():
         running_time_gauge.set(int(elapsed_time))
         time.sleep(1)
 
-@app.before_request
-def before_request():
-    """
-    Called before a request is processed. Captures the start time of the request.
 
-    Returns:
-        None
-    """
-    request.start_time = time.time()
+@app.route('/metrics')
+def metrics():
+    return generate_latest(), 200, {'Content-Type': 'text/plain; charset=utf-8'}
 
-@app.after_request
-def after_request(response):
-    """
-    Called after a request is processed. Measures the response time and updates the metric.
-
-    Args:
-        response (flask.Response): The response object.
-
-    Returns:
-        flask.Response: The modified response object.
-    """
-    response_time = (time.time() - request.start_time)  # Elapsed time in seconds
-    response_time_gauge.set(response_time)
-
-    # Generate latest Prometheus metrics and reset response_time_gauge to 0
-    generate_latest()
-    response_time_gauge.set(0)
-
-    return response
 
 @app.route('/')
 def home():
@@ -127,10 +95,15 @@ def json_endpoint():
     Returns:
         flask.Response: JSON response.
     """
+    start_request_time = time.time()
     file_path = 'json_data/data.json'
     try:
         with open(file_path, 'r') as file:
             data = json.load(file)
+            # Measure the duration of the request and update Prometheus metric
+            end_request_time = time.time()
+            request_duration = (end_request_time - start_request_time) * 1000
+            json_endpoint_duration.set(request_duration)
         return jsonify(data)
     except FileNotFoundError:
         return jsonify({'error': 'JSON file not found'}), 404
@@ -141,7 +114,7 @@ if __name__ == '__main__':
     metric_update_thread = threading.Thread(target=update_metrics)
     metric_update_thread.daemon = True
     metric_update_thread.start()
-    
+
     start_http_server(8000)
-    
+
     app.run(host='0.0.0.0', port=8082)
