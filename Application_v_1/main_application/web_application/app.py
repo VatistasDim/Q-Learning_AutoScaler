@@ -48,6 +48,16 @@ def update_metrics():
         running_time_gauge.set(int(elapsed_time))
         time.sleep(1)
 
+@app.route('/metrics')
+def metrics():
+    """
+    Exposes Prometheus metrics.
+
+    Returns:
+        flask.Response: Prometheus metrics response.
+    """
+    return generate_latest(), 200, {'Content-Type': 'text/plain; charset=utf-8'}
+
 @app.before_request
 def before_request():
     """
