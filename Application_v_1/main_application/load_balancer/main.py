@@ -36,6 +36,9 @@ import prometheus_metrics
 import matplotlib.pyplot as plt
 from datetime import datetime
 from autoscaler_env import AutoscaleEnv
+from docker_api import DockerAPI
+from costs import Costs
+import docker
 
 url = 'http://prometheus:9090/api/v1/query'
 service_name = 'mystack_application'
@@ -82,7 +85,7 @@ def select_action(Q, observation):
         return np.argmax(Q[cpu_state, cpu_value_state, discretized_cpu_share])
 
 
-def update_q_value(Q, state, action, reward, next_state, num_states):
+def update_q_value(Q, state, action, cost, next_state, num_states):
     """
     Updates the Q-value based on the given state, action, reward, and next state.
 
@@ -111,12 +114,13 @@ def update_q_value(Q, state, action, reward, next_state, num_states):
 
     # Update Q-value based on the action
     if action == 2:
-        Q[state[0], state[1], action] = Q[state[0], state[1], action] + alpha * (reward - Q[state[0], state[1], action])
+        Q[state[0], state[1], action] = Q[state[0], state[1], action] + alpha * (cost - Q[state[0], state[1], action])
     else:
         Q[state[0], state[1], action] = Q[state[0], state[1], action] + alpha * (
-            reward + gamma * np.max(Q[next_state[0], next_state[1], :]) - Q[state[0], state[1], action]
+            cost + gamma * np.max(Q[next_state[0], next_state[1], :]) - Q[state[0], state[1], action]
         )
-        
+    return Q
+
 def fetch_data():
     """Fetching the data from the API
 
@@ -131,7 +135,8 @@ def fetch_data():
                 cpu_percent = int(float(metrics[0]))
                 ram_percent = int(float(metrics[1]))
                 time_up = int(float(time_up))
-                return cpu_percent, ram_percent, time_up
+                response_time = int(float(metrics[3]))
+                return cpu_percent, ram_percent, time_up, response_time
         return None, None, None
     except Exception as e:
         print("An error occurred during service metrics retrieval:", e)
@@ -158,7 +163,25 @@ def plot_mse_values(iterations, mse_values, save_path):
     plt.title('MSE Over Iterations')
     plt.legend()
     plt.savefig(f'{save_path}/mse_plot_iteration_{iteration}.png')
-    
+
+def get_current_replica_count(service_prefix):
+    """
+    Gets the replicas number from Docker.
+
+    Args:
+        service_prefix (str): The prefix of the service name.
+
+    Returns:
+        int or None: The number of replicas if found, otherwise None.
+    """
+    client = docker.from_env()
+    try:
+        for service in client.services.list():
+            if service_prefix in service.name:
+                return service.attrs['Spec']['Mode']['Replicated']['Replicas']
+        return None
+    except docker.errors.NotFound:
+        return None
 # This code implementing a control loop that monitors CPU and RAM metrics, takes certain actions based on thresholds and conditions, and updates a Q-value. 
 # It also handles scaling operations based on the current state and actions.
 if __name__ == "__main__":
@@ -175,42 +198,65 @@ if __name__ == "__main__":
     save_path = '/plots' # Set the save path inside the container
     validation_interval = 101 # Perform validation every 101 iterations
     env = AutoscaleEnv(service_name, min_replicas, max_replicas, num_states)
+    docker_client = DockerAPI(service_name)
     obs = env.reset()
     for iteration in range(1, train_steps):  # Run iterations
         
         logger = logging.getLogger(__name__)  # Initialize a logger
         print(f"\n--------Iteration No:{iteration}")  # Print the current iteration number
-        cpu_value, _, time_running = fetch_data()  # Get CPU, RAM values and a placeholder value
+        cpu_value, _, time_running, response_time = fetch_data()  # Get CPU, RAM values and a placeholder value
         print(f"Metrics: |CPU:{str(cpu_value)}% |Time running:{str(time_running)}s")  # Print metrics
         
-        #Observe current state
-        observation = env._get_observation()
+        # #Observe current state
+        # observation = env._get_observation()
         
-        # Take action based on observation
-        action = select_action(Q, observation)
+        # # Take action based on observation
+        # action = select_action(Q, observation)
         
-        # Take a step in the environment
-        current_state, reward, done, _ = env.step(action)
+        # # Take a step in the environment
+        # current_state, cost, done, _ = env.step(action)
         
-        # Observe the next state after the action is taken
-        next_state = env._get_observation()
+        # # Observe the next state after the action is taken
+        # next_state = env._get_observation()
+        
+        #RUNNING CONTAINERS
+        c_cpu_shares = docker_client.get_stack_containers_cpu_shares(service_name=service_name)
+        all_cpu_shares_sets = c_cpu_shares.values()
+        all_cpu_shares_list = [value for sublist in all_cpu_shares_sets for value in sublist]
+        print(f'Cpu-Shares: {all_cpu_shares_list}')
+        average_cpu_shares = sum(all_cpu_shares_list) / len(all_cpu_shares_list)
+        print(f'average cpu shares: {average_cpu_shares}')
+        max_c_cpu_shares = max(all_cpu_shares_list)
+        print(f"Maximum CPU shares: {max_c_cpu_shares}")
+        u_cpu_utilzation = cpu_value
+        k_running_containers = get_current_replica_count(service_prefix=service_name)
+        cost = Costs
+        wperf = 0.90
+        wres = 0.09
+        wadp = 0.01
+        Rmax = 0.05
+        R = response_time
+        cres = 0.01
+        total_cost = cost.overall_cost_function(wadp, wres, wperf, k_running_containers, 0, u_cpu_utilzation, 1, Rmax, max_c_cpu_shares, 10, cres, R)
+        print(f'total_cost: {total_cost}')
+        #KEEP STATES IN SOME KIND OF VARIABLE FOR FURTHER USAGE.
         
         # Update Q value based on action and next state
-        update_q_value(Q, current_state, action, reward, next_state, num_states=num_states)
+        # update_q_value(Q, current_state, action, cost, next_state, num_states=num_states)
         
         # Add one iteration
         iteration += 1
         
         # Log Q-values & Log rewards
-        print(f"Reward: {reward}, Q-values: \n{Q}")
+        #print(f"Reward: {cost}, Q-values: \n{Q}")
         
         # Calculate MSE and store in list
-        mse = calculate_mse(Q, observation)
-        mse_values.append(mse)
+        #mse = calculate_mse(Q, observation)
+        #mse_values.append(mse)
         
-        if iteration % 50 == 0:  # Save plot every 50 iterations
-            print("Plotting...")
-            plot_mse_values(range(1, iteration - 1), mse_values, save_path)
-        np.save('/QSavedWeights/q_values.npy', Q)
+        # if iteration % 50 == 0:  # Save plot every 50 iterations
+        #     print("Plotting...")
+        #     plot_mse_values(range(1, iteration - 1), mse_values, save_path)
+        # np.save('/QSavedWeights/q_values.npy', Q)
     else:  # If CPU or RAM values are None
         print("No metrics available, wait...")  # Indicate no metrics available

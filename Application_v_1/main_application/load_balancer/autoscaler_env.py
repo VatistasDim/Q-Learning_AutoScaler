@@ -236,7 +236,7 @@ class AutoscaleEnv(gym.Env):
                 number_of_containers = get_current_replica_count(service_name)
                 discretized_num_containers = Discretizer.discretize_num_containers(number_of_containers, 10, num_states=self.num_states)
                 discretized_cpu_share = Discretizer.discretize_stack_containers_cpu_shares(cpu_shares, 100, self.num_states)
-                reward = Calculate_total_cost(w_adp=w_adp,
+                cost = Calculate_total_cost(w_adp=w_adp,
                                               w_perf=w_perf,
                                               w_res=w_res,
                                               max_replicas=10,
@@ -245,7 +245,7 @@ class AutoscaleEnv(gym.Env):
                                               cpu_shares=discretized_cpu_share,
                                               response_time=response_time)
                 current_state = self._get_observation()
-                return current_state, reward, self._is_done(), {}
+                return current_state, cost, self._is_done(), {}
             time.sleep(cooldownTimeInSec)
             
     def _get_observation(self):
