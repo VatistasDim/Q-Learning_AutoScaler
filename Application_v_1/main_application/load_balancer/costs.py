@@ -13,14 +13,15 @@ def indicator_resource_performance(action1, action2, k_running_containers, u_cpu
 
 class Costs:
     def overall_cost_function(wadp, wperf, wres, k_running_containers, action1, u_cpu_utilization, action2, Rmax, c_cpu_shares, Kmax, cres, R):
+        action2_sum = sum(sum(inner_list) for inner_list in action2)
         # Term 1
         term1 = wadp * indicator_vertical_scaling(action1)
         print(f'term1:{term1}')
         # Term 2
-        term2 = wperf * indicator_resource_performance(action1, action2, k_running_containers, u_cpu_utilization, Rmax, R)
+        term2 = wperf * indicator_resource_performance(action1, action2_sum, k_running_containers, u_cpu_utilization, Rmax, R)
         print(f'term2:{term2}')
         # Term 3
-        term3 = wres * (k_running_containers + action1) * (c_cpu_shares + action2) / Kmax * cres
+        term3 = wres * (k_running_containers + action1) * (c_cpu_shares + action2_sum) / Kmax * cres
         print(f'term3:{term3}')
         # Overall cost
         cost = term1 + term2 + term3

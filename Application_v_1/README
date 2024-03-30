@@ -1,0 +1,7 @@
+To run:
+
+docker stack rm mystack
+cd load_balancer/
+docker build -t load-balancer ./
+cd ..
+docker stack deploy -c docker-compose.yml mystack
