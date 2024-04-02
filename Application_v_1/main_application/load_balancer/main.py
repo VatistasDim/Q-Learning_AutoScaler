@@ -53,10 +53,12 @@ w_res = 0.4 # w_perf, it's a constant value that determines the importance or im
 #Q = np.load(Q_file) if Q_file else np.zeros((num_states, num_states, 2))
 # Define the maximum values for each state variable
 max_ui = 100  # Maximum value for ui
-max_ci = 1024  # Maximum value for ci
+max_ci = 100  # Maximum value for ci
 max_ki = 10  # Maximum value for ki
+max_a1 = 10
+max_a2 = 100
 # Initialize the Q array with zeros
-Q = np.zeros((max_ui + 1, max_ci + 1, max_ki + 1))
+Q = np.zeros((max_ui + 1, max_ci + 1, max_ki + 1, max_a1 + 1, max_a2 + 1))
 iteration = 1
 
 def discretize_state(cpu_value):
@@ -114,24 +116,32 @@ def update_q_value(Q, reward, alpha, gamma, current_state, next_state, current_a
     """
     ui, ci, ki = current_state
     ui_next, ci_next, ki_next = next_state
+    a1, a2 = current_action
+    a1_next, a2_next = next_action
     ui = round(ui)
     ci = round(ci)
     ki = round(ki)
     ui_next = round(ui_next)
     ci_next = round(ci_next)
     ki_next = round(ki_next)
+    a1 = round(a1)
+    a2 = round(a2)
+    a1_next = round(a1_next)
+    a2_next = round(a2_next)
     print(f'ui:{ui}')
     print(f'ci:{ci}')
     print(f'ki:{ki}')
     print(f'ui_next:{ui_next}')
     print(f'ci_next:{ci_next}')
     print(f'ki_next:{ki_next}')
+    print(f'a1:{a1}')
+    print(f'a2:{a2}')
+    print(f'a1_next:{a1_next}')
+    print(f'a2_next:{a2_next}')
     # Calculate Q(si+1, a') using the Q-values for the next state and action
-    next_q_value = Q[ui_next, ci_next, ki_next]
-    # Update Q-value for the given state and action
-    Q[ui][ci][ki] = \
-        (1 - alpha) * Q[ci][ci_next][ki_next] + \
-        alpha * (reward + gamma * next_q_value)
+    next_q_value = Q[ui_next, ci_next, ki_next, a1_next, a2_next]
+    # Update Q-value for the given state and action and the next_q_value
+    Q[ui][ci][ki][a1][a2] = (1 - alpha) * Q[ci][ci][ki][a1][a2] + alpha * (reward + gamma * next_q_value)
     return Q
 
 def normalize_cpu_shares(cpu_shares):
@@ -262,7 +272,7 @@ def check_cpu_share_change(before_cpu_shares, after_cpu_shares):
             change = after_share - before_share
             changes.append(change)
         cpu_share_changes.append(changes)
-    print(f'cpu_share_changes:{cpu_share_changes}')
+    # print(f'cpu_share_changes:{cpu_share_changes}')
     return cpu_share_changes
 
 def normalize_cpu_share_change(cpu_share_changes):
@@ -284,7 +294,7 @@ def normalize_cpu_share_change(cpu_share_changes):
             else:
                 container_normalized_changes.append(0)  # No change or decrease
         normalized_changes.append(container_normalized_changes)
-    print(f'normalized_changes: {normalized_changes}')
+    # print(f'normalized_changes: {normalized_changes}')
     return normalized_changes
 
 def state():
@@ -358,38 +368,45 @@ if __name__ == "__main__":
         
         c_cpu_shares, u_cpu_utilzation, k_running_containers = state() # read the current state
         current_normalized_cpu_shares = binarize_cpu_shares(c_cpu_shares)
-        a1_current_state = check_container_change(k_running_containers, k_running_containers_next_state) # the value of a1 (increased/decreased containers)
-        
-        if c_cpu_shares_next_state is None:
-            cpu_share_changes = current_normalized_cpu_shares
-        else:
-            cpu_share_changes = check_cpu_share_change(c_cpu_shares.values(), c_cpu_shares_next_state.values()) # Calculate a2 (CPU share change)
+        # a1_current_state = check_container_change(k_running_containers, k_running_containers_next_state) # the value of a1 (increased/decreased containers)
+        # a1_current_state = k_running_containers
+        # if c_cpu_shares_next_state is None:
+        #     cpu_share_changes = current_normalized_cpu_shares
+        # else:
+        #     cpu_share_changes = check_cpu_share_change(c_cpu_shares.values(), c_cpu_shares_next_state.values()) # Calculate a2 (CPU share change)
         
         action = select_action(Q, epsilon) # Take action based on observation
         print(f'action:{action}')
-        
-        a2_current_state = normalize_cpu_share_change(cpu_share_changes) # Normalize a2 in interval of [0,1] in CPU shares changes
+        a2_current_state = normalize_cpu_share_change(current_normalized_cpu_shares) # Normalize a2 in interval of [0,1] in CPU shares changes
         current_state, cost, done, _ = env.step(action) # Take a step in the environment
         c_cpu_shares_next_state, u_cpu_utilzation_next_state, k_running_containers_next_state = state() # read the next current state
-        print(f'running_containers:{k_running_containers}')
-        print(f'running_containers_next_state:{k_running_containers_next_state}')
-        a1_next_state = check_container_change(k_running_containers, k_running_containers_next_state) # the value of a1 (increased/decreased containers)
         cpu_share_changes = check_cpu_share_change(c_cpu_shares.values(), c_cpu_shares_next_state.values()) # Calculate a2 (CPU share change)
         a2_next_state = normalize_cpu_share_change(cpu_share_changes) # Normalize a2 in interval of [0,1] in CPU shares changes
         next_state = env._get_observation() # Observe the next state after the action is taken
         normalized_c_cpu_shares_next_state = binarize_cpu_shares(c_cpu_shares_next_state)
+        normalized_c_cpu_shares_next_state = normalize_cpu_shares(normalized_c_cpu_shares_next_state)
         
         cost = Costs
-        total_cost = cost.overall_cost_function(wadp, wres, wperf, k_running_containers, a1_next_state, u_cpu_utilzation, a2_next_state, Rmax, 1, 10, cres, R)
+        total_cost = cost.overall_cost_function(wadp, 
+                                                wres, 
+                                                wperf, 
+                                                k_running_containers_next_state, 
+                                                u_cpu_utilzation_next_state,
+                                                normalized_c_cpu_shares_next_state, 
+                                                action, 
+                                                k_running_containers_next_state,
+                                                a2_next_state, 
+                                                Rmax,
+                                                10, 
+                                                R)
         total_cost = round(total_cost, 5)
         current_normalized_cpu_shares = normalize_cpu_shares(current_normalized_cpu_shares)
-        normalized_c_cpu_shares_next_state = normalize_cpu_shares(normalized_c_cpu_shares_next_state)
         a2_current_state = normalize_cpu_shares(a2_current_state)
         a2_next_state = normalize_cpu_shares(a2_next_state)
         current_state = (u_cpu_utilzation, current_normalized_cpu_shares, k_running_containers)
         next_state = (u_cpu_utilzation_next_state, normalized_c_cpu_shares_next_state, k_running_containers_next_state)
-        current_state_action = (a1_current_state, a2_current_state)
-        next_state_action = (a1_next_state, a2_next_state)
+        current_state_action = (k_running_containers, a2_current_state)
+        next_state_action = (k_running_containers_next_state, a2_next_state)
         print(Q.shape)
         print(f'total_cost:{total_cost}')
         print(f'alpha:{alpha}')
@@ -399,6 +416,11 @@ if __name__ == "__main__":
         print(f'current_state_action:{current_state_action}')
         print(f'next_state_action:{next_state_action}')
         update_q_value(Q, total_cost, alpha, gamma, current_state, next_state, current_state_action, next_state_action)
+        max_cost_state = np.unravel_index(np.argmax(Q), Q.shape)
+        max_cost = np.max(Q)
+        # Print the highest cost state and its corresponding cost
+        print(f'Highest Cost State: {max_cost_state}')
+        print(f'Highest Cost: {max_cost}')
         iteration += 1
         # Log Q-values & Log rewards
         # print(f"Q-values: \n{Q}")

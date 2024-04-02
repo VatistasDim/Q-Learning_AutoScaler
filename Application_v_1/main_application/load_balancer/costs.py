@@ -7,21 +7,22 @@ def is_vertical_scaling(action):
 def indicator_vertical_scaling(action):
     return 1 if action == 0 else 0
 
-def indicator_resource_performance(action1, action2, k_running_containers, u_cpu_utilization, Rmax, R):
-    condition = R * ((k_running_containers + action1) * (u_cpu_utilization + action2)) > Rmax
+# Next state here
+def indicator_resource_performance(a1, a2, k_next_state, u_next_state, c_next_state, Rmax, R):
+    condition = R * ((k_next_state + a1) * u_next_state * (c_next_state + a2)) > Rmax
     return 1 if condition else 0
 
 class Costs:
-    def overall_cost_function(wadp, wperf, wres, k_running_containers, action1, u_cpu_utilization, action2, Rmax, c_cpu_shares, Kmax, cres, R):
-        action2_sum = sum(sum(inner_list) for inner_list in action2)
+    def overall_cost_function(wadp, wperf, wres, k_next_state, u_next_state, c_next_state, action, a1, a2, Rmax, Kmax, R):
+        action2_sum = sum(sum(inner_list) for inner_list in a2)
         # Term 1
-        term1 = wadp * indicator_vertical_scaling(action1)
+        term1 = wadp * indicator_vertical_scaling(action)
         print(f'term1:{term1}')
         # Term 2
-        term2 = wperf * indicator_resource_performance(action1, action2_sum, k_running_containers, u_cpu_utilization, Rmax, R)
+        term2 = wperf * indicator_resource_performance(a1, action2_sum, k_next_state, u_next_state, c_next_state, Rmax, R)
         print(f'term2:{term2}')
         # Term 3
-        term3 = wres * (k_running_containers + action1) * (c_cpu_shares + action2_sum) / Kmax * cres
+        term3 = wres * (k_next_state + a1) * (c_next_state + action2_sum) / Kmax
         print(f'term3:{term3}')
         # Overall cost
         cost = term1 + term2 + term3
