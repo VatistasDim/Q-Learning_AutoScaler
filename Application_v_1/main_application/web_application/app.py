@@ -21,16 +21,35 @@ Routes:
 
 from flask import Flask, render_template, send_file, jsonify, request
 from prometheus_client import start_http_server, Gauge, generate_latest
-import time, psutil, threading, json
+import time, psutil, threading, json, os
 
 
 cpu_usage_gauge = Gauge('cpu_usage', 'CPU_Usage')
 ram_usage_gauge = Gauge('ram_usage', 'Ram_Usage')
 running_time_gauge = Gauge('running_time', 'Running Time')
 response_time_gauge = Gauge('response_time', 'Response Time')
+cpu_shares_gauge = Gauge('cpu_shares', 'CPU Shares')
 start_time = time.time()
 
 app = Flask(__name__)
+
+def get_cpu_shares():
+    """
+    Get the CPU shares assigned to the container.
+
+    Returns:
+        int: CPU shares value.
+    """
+    try:
+        with open('/sys/fs/cgroup/cpu/cpu.shares', 'r') as file:
+            cpu_shares = int(file.read().strip())
+        return cpu_shares
+    except FileNotFoundError:
+        print("Error: CPU shares file not found.")
+        return None
+    except Exception as e:
+        print("Error:", e)
+        return None
 
 def update_metrics():
     """
@@ -46,6 +65,9 @@ def update_metrics():
         cpu_usage_gauge.set(psutil.cpu_percent())
         ram_usage_gauge.set(psutil.virtual_memory().percent)
         running_time_gauge.set(int(elapsed_time))
+        cpu_shares = get_cpu_shares()
+        if cpu_shares is not None:
+            cpu_shares_gauge.set(cpu_shares)
         time.sleep(1)
 
 @app.route('/metrics')

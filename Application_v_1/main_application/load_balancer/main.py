@@ -31,7 +31,7 @@ Usage:
 """
 
 import numpy as np
-import random, logging
+import random, logging, time
 import prometheus_metrics
 import matplotlib.pyplot as plt
 from datetime import datetime
@@ -180,11 +180,12 @@ def fetch_data():
                 ram_percent = int(float(metrics[1]))
                 time_up = int(float(time_up))
                 response_time = int(float(metrics[3]))
-                return cpu_percent, ram_percent, time_up, response_time
-        return None, None, None
+                cpu_shares = int(metrics[4])
+                return cpu_percent, ram_percent, time_up, response_time, cpu_shares
+        return None, None, None, None
     except Exception as e:
         print("An error occurred during service metrics retrieval:", e)
-        return None, None, None
+        return None, None, None, None
 
 def calculate_mse(Q, env, observations):
     mse_sum = 0
@@ -310,8 +311,8 @@ def state():
             - int: The number of running containers in the specified service.
     """
     docker_client = DockerAPI(service_name)
-    cpu_value, _, _, _ = fetch_data()
-    c_cpu_shares = docker_client.get_stack_containers_cpu_shares(service_name=service_name)
+    cpu_value, _, _, _, c_cpu_shares = fetch_data()
+    #c_cpu_shares = docker_client.get_stack_containers_cpu_shares(service_name=service_name)
     u_cpu_utilzation = cpu_value
     k_running_containers = get_current_replica_count(service_prefix=service_name)
     return c_cpu_shares, u_cpu_utilzation, k_running_containers
@@ -361,13 +362,12 @@ if __name__ == "__main__":
     for iteration in range(1, train_steps):  # Run iterations
         logger = logging.getLogger(__name__)  # Initialize a logger
         print(f"\n--------Iteration No:{iteration}")  # Print the current iteration number
-        cpu_value, _, time_running, response_time = fetch_data()  # Get CPU, RAM values and a placeholder value
+        cpu_value, _, time_running, response_time, cpu_shares = fetch_data()  # Get CPU, RAM values and a placeholder value
         R = response_time
-        print(f"Metrics: |CPU:{str(cpu_value)}% |Time running:{str(time_running)}s")  # Print metrics
+        print(f"Metrics: | CPU:{str(cpu_value)}% | Time Running:{str(time_running)}s | Response Time:{str(response_time)} | CPU Shares: {str(cpu_shares)}")  # Print metrics
         observation = env._get_observation()
-        
         c_cpu_shares, u_cpu_utilzation, k_running_containers = state() # read the current state
-        current_normalized_cpu_shares = binarize_cpu_shares(c_cpu_shares)
+        #current_normalized_cpu_shares = binarize_cpu_shares(c_cpu_shares)
         # a1_current_state = check_container_change(k_running_containers, k_running_containers_next_state) # the value of a1 (increased/decreased containers)
         # a1_current_state = k_running_containers
         # if c_cpu_shares_next_state is None:
@@ -377,14 +377,18 @@ if __name__ == "__main__":
         
         action = select_action(Q, epsilon) # Take action based on observation
         print(f'action:{action}')
-        a2_current_state = normalize_cpu_share_change(current_normalized_cpu_shares) # Normalize a2 in interval of [0,1] in CPU shares changes
+        #a2_current_state = normalize_cpu_share_change(current_normalized_cpu_shares) # Normalize a2 in interval of [0,1] in CPU shares changes
+        a2_current_state = c_cpu_shares
         current_state, cost, done, _ = env.step(action) # Take a step in the environment
+        print("System waits for 60 seconds to retrieve the next state.")
+        time.sleep(61)
         c_cpu_shares_next_state, u_cpu_utilzation_next_state, k_running_containers_next_state = state() # read the next current state
-        cpu_share_changes = check_cpu_share_change(c_cpu_shares.values(), c_cpu_shares_next_state.values()) # Calculate a2 (CPU share change)
-        a2_next_state = normalize_cpu_share_change(cpu_share_changes) # Normalize a2 in interval of [0,1] in CPU shares changes
+        #cpu_share_changes = check_cpu_share_change(c_cpu_shares.values(), c_cpu_shares_next_state.values()) # Calculate a2 (CPU share change)
+        #a2_next_state = normalize_cpu_share_change(cpu_share_changes) # Normalize a2 in interval of [0,1] in CPU shares changes
+        a2_next_state = c_cpu_shares_next_state
         next_state = env._get_observation() # Observe the next state after the action is taken
-        normalized_c_cpu_shares_next_state = binarize_cpu_shares(c_cpu_shares_next_state)
-        normalized_c_cpu_shares_next_state = normalize_cpu_shares(normalized_c_cpu_shares_next_state)
+        # normalized_c_cpu_shares_next_state = binarize_cpu_shares(c_cpu_shares_next_state)
+        # normalized_c_cpu_shares_next_state = normalize_cpu_shares(normalized_c_cpu_shares_next_state)
         
         cost = Costs
         total_cost = cost.overall_cost_function(wadp, 
@@ -392,7 +396,7 @@ if __name__ == "__main__":
                                                 wperf, 
                                                 k_running_containers_next_state, 
                                                 u_cpu_utilzation_next_state,
-                                                normalized_c_cpu_shares_next_state, 
+                                                c_cpu_shares_next_state, 
                                                 action, 
                                                 k_running_containers_next_state,
                                                 a2_next_state, 
@@ -404,7 +408,7 @@ if __name__ == "__main__":
         a2_current_state = normalize_cpu_shares(a2_current_state)
         a2_next_state = normalize_cpu_shares(a2_next_state)
         current_state = (u_cpu_utilzation, current_normalized_cpu_shares, k_running_containers)
-        next_state = (u_cpu_utilzation_next_state, normalized_c_cpu_shares_next_state, k_running_containers_next_state)
+        next_state = (u_cpu_utilzation_next_state, c_cpu_shares_next_state, k_running_containers_next_state)
         current_state_action = (k_running_containers, a2_current_state)
         next_state_action = (k_running_containers_next_state, a2_next_state)
         print(Q.shape)
