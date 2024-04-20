@@ -1,7 +1,7 @@
 import requests
 
 def get_cpu_metrics(url):
-    params = {'query': "cpu_usage"}
+    params = {'query': 'avg(cpu_usage{job="swarm-service"})'}
     try:
         response = requests.get(url, params=params)
         if response.status_code == 200:
@@ -19,7 +19,7 @@ def get_cpu_metrics(url):
         return None
 
 def get_memory_metrics(url):
-    params = {'query': "ram_usage"}
+    params = {'query': 'avg(ram_usage{job="swarm-service"})'}
     try:
         response = requests.get(url, params=params)
         if response.status_code == 200:
@@ -37,7 +37,7 @@ def get_memory_metrics(url):
         return None
 
 def get_service_up_time(url):
-    params = {'query': "running_time"}
+    params = {'query': 'sum(running_time{job="swarm-service"})'}
     try:
         response = requests.get(url, params=params)
         if response.status_code == 200:
@@ -55,7 +55,7 @@ def get_service_up_time(url):
         return None
 
 def get_response_time(url):
-    params = {'query': "response_time"}
+    params = {'query': 'sum(response_time{job="swarm-service"})'}
     try:
         response = requests.get(url, params=params)
         if response.status_code == 200:
@@ -73,7 +73,7 @@ def get_response_time(url):
         return None
     
 def get_cpu_shares(url):
-    params = {'query': "cpu_shares"}
+    params = {'query': 'avg(cpu_shares{job="swarm-service"})'}
     try:
         response = requests.get(url, params=params)
         if response.status_code == 200:
