@@ -1,11 +1,27 @@
-version: '3.1'
-    
+version: '3.9'
+
+networks:
+  custom-overlay-network:
+    driver: overlay
+
 services:
+
   application:
     image: application
     ports:
-      - "8082:8082"
+      - "8080:8080"
       - "8000:8000"
+    deploy:
+      mode: replicated
+      resources:
+        limits:
+          cpus: "2"
+          memory: 512M
+      placement:
+        constraints:
+          - node.role == worker
+    networks:
+      - custom-overlay-network
 
   prometheus:
     image: prom/prometheus:v2.30.3
@@ -15,27 +31,46 @@ services:
       - ./prometheus:/etc/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
-  
+    networks:
+      - custom-overlay-network
+
   cadvisor:
     image: google/cadvisor:latest
+    container_name: cadvisor
     ports:
-      - "8081:8080"
+      - "8081:8080" # Expose cAdvisor's web interface
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:rw
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
+    deploy:
+      mode: global
+      resources:
+        limits:
+          cpus: "1"
+          memory: 256M
+        reservations:
+          memory: 64M 
+    networks:
+      - custom-overlay-network
 
   load-balancer:
     image: load-balancer
     volumes:
-      - ~/tutorial/Application_v_1/plots:/plots
-      - ~/tutorial/Application_v_1/QSavedWeights:/QSavedWeights
+      - ~/vatistas/plots:/plots
+      - ~/vatistas/QSavedWeights:/QSavedWeights
       - /var/run/docker.sock:/var/run/docker.sock
     deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
       placement:
         constraints:
           - node.role == manager
+    networks:
+      - custom-overlay-network
 
   grafana:
     image: grafana/grafana:latest
@@ -43,3 +78,5 @@ services:
       - "3000:3000"
     depends_on:
       - prometheus
+    networks:
+      - custom-overlay-network
