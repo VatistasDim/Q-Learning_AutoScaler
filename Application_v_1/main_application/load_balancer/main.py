@@ -40,6 +40,7 @@ from docker_api import DockerAPI
 from costs import Costs
 import docker
 
+wait_time = 15
 url = 'http://prometheus:9090/api/v1/query'
 service_name = 'mystack_application'
 application_url = 'http://application:8501/train'
@@ -94,7 +95,8 @@ def select_action(Q, epsilon):
         return np.random.randint(2)
     else:
         # Choose the greedy action based on Q-values
-        greedy_action = np.argmax(Q)
+        greedy_action = np.argmin(Q)
+        print(f'greedy_action:{greedy_action}')
         return min(greedy_action, 1)  # Ensure the action is within [0, 1]
 
 def update_q_value(Q, reward, alpha, gamma, current_state, next_state, current_action, next_action):
@@ -181,11 +183,24 @@ def fetch_data():
                 time_up = int(float(time_up))
                 response_time = int(float(metrics[3]))
                 cpu_shares = int(metrics[4])
+                cpu_shares = calculate_cpu_shares(cpu_shares)
                 return cpu_percent, ram_percent, time_up, response_time, cpu_shares
         return None, None, None, None
     except Exception as e:
         print("An error occurred during service metrics retrieval:", e)
         return None, None, None, None
+
+def calculate_cpu_shares(cpu_share):
+    if cpu_share == 1024:
+        return 100
+    elif cpu_share == 512:
+        return 50
+    elif cpu_share == 256:
+        return 25
+    elif cpu_share == 128:
+        return 15
+    else:
+        return 5
 
 def calculate_mse(Q, env, observations):
     mse_sum = 0
@@ -232,6 +247,26 @@ def get_current_replica_count(service_prefix):
             if service_prefix in service.name:
                 return service.attrs['Spec']['Mode']['Replicated']['Replicas']
         return None
+    except docker.errors.NotFound:
+        return None
+
+def get_replica_names(service_prefix):
+    """
+    Gets the names of replicas with the specified service prefix.
+
+    Args:
+        service_prefix (str): The prefix of the service name.
+
+    Returns:
+        list or None: List of replica names if found, otherwise None.
+    """
+    client = docker.from_env()
+    try:
+        replica_names = []
+        for service in client.services.list():
+            if service_prefix in service.name:
+                replica_names.append(service.name)
+        return replica_names if replica_names else None
     except docker.errors.NotFound:
         return None
     
@@ -341,6 +376,8 @@ if __name__ == "__main__":
     now = datetime.now()
     dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
     print(f"Application Information:\nStart date & time:{dt_string}\nObservable service name:{service_name}\nContext urls:{url}, {application_url},\nTrain Steps = {train_steps}\n")
+    replicas_names = get_replica_names(service_name)
+    print(replicas_names)
     mse_values = [] # Initialize empty list to store MSE values
     rewards = []
     replicas_count = []
@@ -374,14 +411,13 @@ if __name__ == "__main__":
         #     cpu_share_changes = current_normalized_cpu_shares
         # else:
         #     cpu_share_changes = check_cpu_share_change(c_cpu_shares.values(), c_cpu_shares_next_state.values()) # Calculate a2 (CPU share change)
-        
         action = select_action(Q, epsilon) # Take action based on observation
         print(f'action:{action}')
         #a2_current_state = normalize_cpu_share_change(current_normalized_cpu_shares) # Normalize a2 in interval of [0,1] in CPU shares changes
         a2_current_state = c_cpu_shares
         current_state, cost, done, _ = env.step(action) # Take a step in the environment
-        print("System waits for 60 seconds to retrieve the next state.")
-        time.sleep(61)
+        print(f'System waits for {wait_time} seconds to retrieve the next state.')
+        time.sleep(wait_time)
         c_cpu_shares_next_state, u_cpu_utilzation_next_state, k_running_containers_next_state = state() # read the next current state
         #cpu_share_changes = check_cpu_share_change(c_cpu_shares.values(), c_cpu_shares_next_state.values()) # Calculate a2 (CPU share change)
         #a2_next_state = normalize_cpu_share_change(cpu_share_changes) # Normalize a2 in interval of [0,1] in CPU shares changes
@@ -404,14 +440,13 @@ if __name__ == "__main__":
                                                 10, 
                                                 R)
         total_cost = round(total_cost, 5)
-        current_normalized_cpu_shares = normalize_cpu_shares(current_normalized_cpu_shares)
-        a2_current_state = normalize_cpu_shares(a2_current_state)
-        a2_next_state = normalize_cpu_shares(a2_next_state)
-        current_state = (u_cpu_utilzation, current_normalized_cpu_shares, k_running_containers)
-        next_state = (u_cpu_utilzation_next_state, c_cpu_shares_next_state, k_running_containers_next_state)
+        # current_normalized_cpu_shares = normalize_cpu_shares(current_normalized_cpu_shares)
+        a2_current_state = c_cpu_shares
+        a2_next_state = c_cpu_shares_next_state
+        current_state = (u_cpu_utilzation, a2_current_state, k_running_containers)
+        next_state = (u_cpu_utilzation_next_state, a2_next_state, k_running_containers_next_state)
         current_state_action = (k_running_containers, a2_current_state)
         next_state_action = (k_running_containers_next_state, a2_next_state)
-        print(Q.shape)
         print(f'total_cost:{total_cost}')
         print(f'alpha:{alpha}')
         print(f'gamma:{gamma}')
@@ -425,6 +460,11 @@ if __name__ == "__main__":
         # Print the highest cost state and its corresponding cost
         print(f'Highest Cost State: {max_cost_state}')
         print(f'Highest Cost: {max_cost}')
+        min_cost_state = np.unravel_index(np.argmin(Q), Q.shape)
+        min_cost = np.min(Q)
+        # Print the highest cost state and its corresponding cost
+        print(f'Lowest Cost State: {min_cost_state}')
+        print(f'Min Cost: {min_cost}')
         iteration += 1
         # Log Q-values & Log rewards
         # print(f"Q-values: \n{Q}")
