@@ -1,35 +1,3 @@
-"""
-Autoscaler Control Script
-
-This script implements a control loop that monitors CPU and RAM metrics, takes certain actions based on thresholds and conditions,
-and updates a Q-value. It also handles scaling operations based on the current state and actions.
-
-Constants:
-- url: Prometheus URL for metric retrieval.
-- service_name: The name of the observable service.
-- application_url: URL for application training.
-- cpu_threshold: CPU threshold for scaling operations.
-- ram_threshold: RAM threshold for scaling operations.
-- max_replicas: Maximum number of replicas.
-- min_replicas: Minimum number of replicas.
-- num_states: Number of discretized states.
-- Q: Q-value array for Q-learning.
-- iteration: Current iteration count.
-
-Functions:
-- discretize_state(cpu_value, ram_value): Discretizes CPU and RAM values.
-- select_action(Q, cpu_state, ram_state): Selects an action based on the given state.
-- update_q_value(Q, state, action, reward, next_state): Updates the Q-value based on the given state, action, reward, and next state.
-- fetch_data(): Fetches CPU, RAM, and running time metrics from Prometheus.
-- calculate_mse(Q, target_values): Calculates Mean Squared Error (MSE).
-- plot_values(iterations, mse_values, save_path): Plots MSE over iterations.
-
-Usage:
-- Set the necessary constants for metric retrieval, service details, thresholds, and Q-learning.
-- Configure the training steps, save path, and validation interval.
-- Run the script to perform Q-learning-based autoscaling.
-"""
-
 import numpy as np
 import random, logging, time
 import prometheus_metrics
@@ -39,7 +7,16 @@ from autoscaler_env import AutoscaleEnv
 from docker_api import DockerAPI
 from costs import Costs
 import docker
+import itertools
 
+wperf = 0.90
+wres = 0.09
+wadp = 0.01
+Rmax = 0.05
+alpha = 0.5
+gamma = 0.5
+epsilon = 0.4
+cres = 0.01
 wait_time = 15
 url = 'http://prometheus:9090/api/v1/query'
 service_name = 'mystack_application'
@@ -50,34 +27,35 @@ max_cpu_shares = 100
 num_states = 3
 w_perf = 0.5 # represents the weight assigned to the performance penalty term in the cost function
 w_res = 0.4 # w_perf, it's a constant value that determines the importance or impact of the resource cost in the overall cost calculation.
-#Q_file = "q_values.npy"
-#Q = np.load(Q_file) if Q_file else np.zeros((num_states, num_states, 2))
-# Define the maximum values for each state variable
-max_ui = 100  # Maximum value for ui
-max_ci = 100  # Maximum value for ci
-max_ki = 10  # Maximum value for ki
-max_a1 = 10
-max_a2 = 100
-# Initialize the Q array with zeros
-Q = np.zeros((max_ui + 1, max_ci + 1, max_ki + 1, max_a1 + 1, max_a2 + 1))
+max_containers = 11
+# Define the ranges for CPU utilization, number of running containers, and CPU shares
+cpu_utilization_values = range(101)  # CPU utilization values from 0 to 100
+k_range = range(1, max_containers)  # Number of running containers (1 to 11)
+cpu_shares_values = [1.0, 0.75, 0.50, 0.25, 0.5]  # CPU shares (1.0, 0.75, 0.50, 0.25, 0.5)
+
+# Generate all combinations of CPU utilization, K, and CPU shares
+state_space = list(itertools.product(cpu_shares_values, cpu_utilization_values, k_range))
+action_space = [-1, 0, 1]  # Actions: -1 (scale in), 0 (do nothing), 1 (scale out)
+Q = np.zeros((len(state_space), len(action_space)))
 iteration = 1
 
-def discretize_state(cpu_value):
-    """
-    Discretizes CPU and RAM values.
-
-    Args:
-        cpu_value (float): The CPU value.
-        ram_value (float): The RAM value.
-
-    Returns:
-        tuple: A tuple containing the discretized CPU and RAM states.
-    """
-    cpu_state = int(cpu_value)
-    
-    cpu_state = max(0, min(cpu_state, num_states - 1))
-
-    return cpu_state
+def transition(action):
+    running_containers = get_current_replica_count(service_prefix = service_name)
+    if action == -1 and running_containers > 1:  # Scale in (decrease containers)
+        scale_in(service_name = service_name, scale_out_factor = 1)
+    elif action == 1:  # Scale out (increase containers)
+        desired_replicas = get_current_replica_count(service_prefix = service_name)
+        if desired_replicas < 10:
+            desired_replicas = desired_replicas + 1
+        else:
+            print("Max replicas.")
+            c, u, k = state()
+            return (c, u, k)
+        scale_out(service_name = service_name, desired_replicas = desired_replicas)
+    elif action == 0:
+        time.sleep(15)
+    c, u, k = state()
+    return (c, u, k)
 
 def select_action(Q, epsilon):
     """
@@ -99,73 +77,52 @@ def select_action(Q, epsilon):
         print(f'greedy_action:{greedy_action}')
         return min(greedy_action, 1)  # Ensure the action is within [0, 1]
 
-def update_q_value(Q, reward, alpha, gamma, current_state, next_state, current_action, next_action):
-    """
-    Update the Q-value based on the given current state, action, reward, and next state.
-
-    Parameters:
-        Q (numpy.ndarray): The Q-values.
-        reward (float): The reward received for the action.
-        alpha (float): The learning rate.
-        gamma (float): The discount factor.
-        current_state (tuple): The current state (ui, ci, ki).
-        next_state (tuple): The next state (ui_next, ci_next, ki_next).
-        current_action (tuple): The selected current action (a1, a2).
-        next_action (tuple): The selected next action (a1_next, a2_next).
-
-    Returns:
-        numpy.ndarray: Updated Q-values.
-    """
-    ui, ci, ki = current_state
-    ui_next, ci_next, ki_next = next_state
-    a1, a2 = current_action
-    a1_next, a2_next = next_action
-    ui = round(ui)
-    ci = round(ci)
-    ki = round(ki)
-    ui_next = round(ui_next)
-    ci_next = round(ci_next)
-    ki_next = round(ki_next)
-    a1 = round(a1)
-    a2 = round(a2)
-    a1_next = round(a1_next)
-    a2_next = round(a2_next)
-    print(f'ui:{ui}')
-    print(f'ci:{ci}')
-    print(f'ki:{ki}')
-    print(f'ui_next:{ui_next}')
-    print(f'ci_next:{ci_next}')
-    print(f'ki_next:{ki_next}')
-    print(f'a1:{a1}')
-    print(f'a2:{a2}')
-    print(f'a1_next:{a1_next}')
-    print(f'a2_next:{a2_next}')
-    # Calculate Q(si+1, a') using the Q-values for the next state and action
-    next_q_value = Q[ui_next, ci_next, ki_next, a1_next, a2_next]
-    # Update Q-value for the given state and action and the next_q_value
-    Q[ui][ci][ki][a1][a2] = (1 - alpha) * Q[ci][ci][ki][a1][a2] + alpha * (reward + gamma * next_q_value)
-    return Q
-
-def normalize_cpu_shares(cpu_shares):
-    inner_list = cpu_shares[0]
-    total_shares = sum(inner_list)
-    normalized_cpu_shares = total_shares / len(inner_list)
-    return normalized_cpu_shares
-
-def state_to_index(state):
-    """
-    Convert the state tuple to an index for accessing Q-values.
-
-    Parameters:
-        state (tuple): A tuple representing the state (ki, ui, ci).
-
-    Returns:
-        tuple: A tuple representing the index.
-    """
-    # Convert the state tuple to an index
-    # Here, you can implement a mapping logic based on the ranges of ki, ui, ci
-    # For simplicity, let's assume ki, ui, ci are already discretized and their values are indices
-    return state
+#def update_q_value(Q, reward, alpha, gamma, current_state, next_state, current_action, next_action):
+#    """
+#    Update the Q-value based on the given current state, action, reward, and next state.
+#
+#    Parameters:
+#        Q (numpy.ndarray): The Q-values.
+#        reward (float): The reward received for the action.
+#        alpha (float): The learning rate.
+#        gamma (float): The discount factor.
+#        current_state (tuple): The current state (ui, ci, ki).
+#        next_state (tuple): The next state (ui_next, ci_next, ki_next).
+#        current_action (tuple): The selected current action (a1, a2).
+#        next_action (tuple): The selected next action (a1_next, a2_next).
+#
+#    Returns:
+#        numpy.ndarray: Updated Q-values.
+#    """
+#    ui, ci, ki = current_state
+#    ui_next, ci_next, ki_next = next_state
+#    a1, a2 = current_action
+#    a1_next, a2_next = next_action
+#    ui = round(ui)
+#    ci = round(ci)
+#    ki = round(ki)
+#    ui_next = round(ui_next)
+#    ci_next = round(ci_next)
+#    ki_next = round(ki_next)
+#    a1 = round(a1)
+#    a2 = round(a2)
+#    a1_next = round(a1_next)
+#    a2_next = round(a2_next)
+#    print(f'ui:{ui}')
+#    print(f'ci:{ci}')
+#    print(f'ki:{ki}')
+#    print(f'ui_next:{ui_next}')
+#    print(f'ci_next:{ci_next}')
+#    print(f'ki_next:{ki_next}')
+#    print(f'a1:{a1}')
+#    print(f'a2:{a2}')
+#    print(f'a1_next:{a1_next}')
+#    print(f'a2_next:{a2_next}')
+#    # Calculate Q(si+1, a') using the Q-values for the next state and action
+#    next_q_value = Q[ui_next, ci_next, ki_next, a1_next, a2_next]
+#    # Update Q-value for the given state and action and the next_q_value
+#    Q[ui][ci][ki][a1][a2] = (1 - alpha) * Q[ci][ci][ki][a1][a2] + alpha * (reward + gamma * next_q_value)
+#    return Q
 
 def fetch_data():
     """Fetching the data from the API
@@ -173,34 +130,41 @@ def fetch_data():
     Returns:
         _type_: cpu_percent(int), ram_percent(int), time_up(int) or None for all.
     """
-    try:
-        metrics = prometheus_metrics.start_metrics_service(url=url)
-        if metrics is not None:
-            time_up = metrics[2]
+    max_attempts = 3
+    for attempt in range(max_attempts):
+        try:
+            cpu_percent, ram_percent, time_up, response_time, cpu_shares = prometheus_metrics.start_metrics_service(url=url)
             if time_up != '0':
-                cpu_percent = int(float(metrics[0]))
-                ram_percent = int(float(metrics[1]))
+                cpu_percent = int(float(cpu_percent))
+                ram_percent = int(float(ram_percent))
                 time_up = int(float(time_up))
-                response_time = int(float(metrics[3]))
-                cpu_shares = int(metrics[4])
+                response_time = int(float(response_time))
+                cpu_shares = int(cpu_shares)
                 cpu_shares = calculate_cpu_shares(cpu_shares)
+                # Check if any value is None, if so, continue fetching
+                if None in (cpu_percent, ram_percent, time_up, response_time, cpu_shares):
+                    continue
                 return cpu_percent, ram_percent, time_up, response_time, cpu_shares
-        return None, None, None, None
-    except Exception as e:
-        print("An error occurred during service metrics retrieval:", e)
-        return None, None, None, None
+        except Exception as e:
+            print(f"An error occurred during service metrics retrieval (Attempt {attempt + 1}/{max_attempts}):", e)
+            if attempt < max_attempts - 1:
+                # Wait for a few seconds before retrying
+                time.sleep(60)
+    print("Failed to retrieve metrics after multiple attempts.")
+    return None, None, None, None, None
+
 
 def calculate_cpu_shares(cpu_share):
     if cpu_share == 1024:
-        return 100
+        return 1
     elif cpu_share == 512:
-        return 50
+        return 0.5
     elif cpu_share == 256:
-        return 25
+        return 0.25
     elif cpu_share == 128:
-        return 15
+        return 0.15
     else:
-        return 5
+        return 0.5
 
 def calculate_mse(Q, env, observations):
     mse_sum = 0
@@ -250,88 +214,30 @@ def get_current_replica_count(service_prefix):
     except docker.errors.NotFound:
         return None
 
-def get_replica_names(service_prefix):
+def scale_out(service_name, desired_replicas):
     """
-    Gets the names of replicas with the specified service prefix.
-
-    Args:
-        service_prefix (str): The prefix of the service name.
-
-    Returns:
-        list or None: List of replica names if found, otherwise None.
+    Scales out a service to the specified number of replicas.
     """
     client = docker.from_env()
-    try:
-        replica_names = []
-        for service in client.services.list():
-            if service_prefix in service.name:
-                replica_names.append(service.name)
-        return replica_names if replica_names else None
-    except docker.errors.NotFound:
-        return None
-    
-def check_container_change(before_containers, after_containers):
+    service = client.services.get(service_name)
+    service.scale(desired_replicas)
+    print(f"Service '{service_name}' scaled to {desired_replicas} replicas.")
+    time.sleep(15)
+
+def scale_in(service_name, scale_out_factor):
     """
-    Check the change in the number of containers before and after an action.
+    Scales in a service to the specified number of replicas.
 
-    Parameters:
-        before_containers (int): The number of containers before the action.
-        after_containers (int): The number of containers after the action.
-
-    Returns:
-        int: A binary value indicating the change:
-             - 1 if the number of containers increased.
-             - 0 if the number of containers stayed the same or decreased.
+    Args:
+        service_name (str): Name of the service to scale.
+        scale_out_factor (int): The number of replicas to scale in by.
     """
-    if after_containers > before_containers:
-        return 1
-    elif after_containers < before_containers:
-        return 0
-    else:
-        return 0
-    
-def check_cpu_share_change(before_cpu_shares, after_cpu_shares):
-    """
-    Check the change in CPU shares before and after an action for each container.
-
-    Parameters:
-        before_cpu_shares (list): List of lists representing CPU shares before the action.
-        after_cpu_shares (list): List of lists representing CPU shares after the action.
-
-    Returns:
-        list: List of lists representing changes in CPU shares for each container.
-    """
-    cpu_share_changes = []
-    for before_container, after_container in zip(before_cpu_shares, after_cpu_shares):
-        changes = []
-        for before_share, after_share in zip(before_container, after_container):
-            change = after_share - before_share
-            changes.append(change)
-        cpu_share_changes.append(changes)
-    # print(f'cpu_share_changes:{cpu_share_changes}')
-    return cpu_share_changes
-
-def normalize_cpu_share_change(cpu_share_changes):
-    """
-    Normalize the changes in CPU shares to binary values indicating increase or decrease.
-
-    Parameters:
-        cpu_share_changes (list): List of lists representing changes in CPU shares for each container.
-
-    Returns:
-        list: List of lists representing normalized changes in CPU shares for each container.
-    """
-    normalized_changes = []
-    for container_changes in cpu_share_changes:
-        container_normalized_changes = []
-        for change in container_changes:
-            if change > 0:
-                container_normalized_changes.append(1)  # Increase
-            else:
-                container_normalized_changes.append(0)  # No change or decrease
-        normalized_changes.append(container_normalized_changes)
-    # print(f'normalized_changes: {normalized_changes}')
-    return normalized_changes
+    client = docker.from_env()
+    service = client.services.get(service_name)
+    current_replicas = get_current_replica_count(service_name)
+    desired_replicas = current_replicas - scale_out_factor
+    service.scale(desired_replicas)
+    time.sleep(15)
 
 def state():
     """
@@ -347,135 +253,229 @@ def state():
     """
     docker_client = DockerAPI(service_name)
     cpu_value, _, _, _, c_cpu_shares = fetch_data()
-    #c_cpu_shares = docker_client.get_stack_containers_cpu_shares(service_name=service_name)
     u_cpu_utilzation = cpu_value
     k_running_containers = get_current_replica_count(service_prefix=service_name)
     return c_cpu_shares, u_cpu_utilzation, k_running_containers
 
-def binarize_cpu_shares(cpu_shares):
+#if __name__ == "__main__":
+#    """
+#    The main method for this project
+#    """
+#    train_steps = 101
+#    now = datetime.now()
+#    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+#    print(f"Application Information:\nStart date & time:{dt_string}\nObservable service name:{service_name}\nContext urls:{url}, {application_url},\nTrain Steps = {train_steps}\n")
+#    #mse_values = [] # Initialize empty list to store MSE values
+#    #rewards = []
+#    #replicas_count = []
+#    #save_path = '/plots' # Set the save path inside the container
+#    #validation_interval = 101 # Perform validation every 101 iterations
+#    #env = AutoscaleEnv(service_name, min_replicas, max_replicas, num_states)
+#    #obs = env.reset()
+#    wperf = 0.90
+#    wres = 0.09
+#    wadp = 0.01
+#    Rmax = 0.05
+#    alpha = 0.5
+#    gamma = 0.5
+#    epsilon = 0.4
+#    cres = 0.01
+#    k_running_containers_next_state = 0
+#    c_cpu_shares_next_state = None
+#    mse_values = []
+#    for iteration in range(1, train_steps):  # Run iterations
+#        logger = logging.getLogger(__name__)  # Initialize a logger
+#        print(f"\n--------Iteration No:{iteration}")  # Print the current iteration number
+#        cpu_value, _, time_running, response_time, cpu_shares = fetch_data()  # Get CPU, RAM values and a placeholder value
+#        R = response_time
+#        print(f"Metrics: | CPU:{str(cpu_value)}% | Time Running:{str(time_running)}s | Response Time:{str(response_time)} | CPU Shares: {str(cpu_shares)}")  # Print metrics
+#        c_cpu_shares, u_cpu_utilzation, k_running_containers = state() # read the current state
+#        # action = select_action(Q, epsilon) # Take action based on observation
+#        # Select action using epsilon-greedy strategy
+#        if np.random.uniform(0, 1) < epsilon:
+#            action = np.random.choice(action_space)
+#        else:
+#            action = np.argmin(Q[state_space.index(state)])
+#        print(f'action:{action}')
+#        next_state = transition(state, action)
+#        a2_current_state = c_cpu_shares
+#        current_state, cost, done, _ = env.step(action) # Take a step in the environment
+#        print(f'System waits for {wait_time} seconds to retrieve the next state.')
+#        time.sleep(wait_time)
+#        c_cpu_shares_next_state, u_cpu_utilzation_next_state, k_running_containers_next_state = state() # read the next current state
+#        a2_next_state = c_cpu_shares_next_state
+#        next_state = env._get_observation() # Observe the next state after the action is taken
+#        cost = Costs
+#        total_cost = cost.overall_cost_function(wadp, 
+#                                                wres, 
+#                                                wperf, 
+#                                                k_running_containers_next_state, 
+#                                                u_cpu_utilzation_next_state,
+#                                                c_cpu_shares_next_state, 
+#                                                action, 
+#                                                k_running_containers_next_state,
+#                                                a2_next_state, 
+#                                                Rmax,
+#                                                10, 
+#                                                R)        
+#        total_cost = round(total_cost, 5)
+#        Q[state_space.index(state)][action_space.index(action)] += alpha * \
+#                (total_cost + gamma * np.max(Q[state_space.index(next_state)]) - Q[state_space.index(state)][action_space.index(action)])
+#        
+#        #a2_current_state = c_cpu_shares
+#        #a2_next_state = c_cpu_shares_next_state
+#        #current_state = (u_cpu_utilzation, a2_current_state, k_running_containers)
+#        #next_state = (u_cpu_utilzation_next_state, a2_next_state, k_running_containers_next_state)
+#        #current_state_action = (k_running_containers, a2_current_state)
+#        #next_state_action = (k_running_containers_next_state, a2_next_state)
+#        #print(f'total_cost:{total_cost}')
+#        #print(f'alpha:{alpha}')
+#        #print(f'gamma:{gamma}')
+#        #print(f'current_state:{current_state}')
+#        #print(f'next_state:{next_state}')
+#        #print(f'current_state_action:{current_state_action}')
+#        #print(f'next_state_action:{next_state_action}')
+#        #update_q_value(Q, total_cost, alpha, gamma, current_state, next_state, current_state_action, next_state_action)
+#        #max_cost_state = np.unravel_index(np.argmax(Q), Q.shape)
+#        #max_cost = np.max(Q)
+#        #print(f'Highest Cost State: {max_cost_state}')
+#        #print(f'Highest Cost: {max_cost}')
+#        #min_cost_state = np.unravel_index(np.argmin(Q), Q.shape)
+#        #min_cost = np.min(Q)
+#        #print(f'Lowest Cost State: {min_cost_state}')
+#        #print(f'Min Cost: {min_cost}')
+#        #iteration += 1
+#    else:  # If CPU or RAM values are None
+#        print("No metrics available, wait...")  # Indicate no metrics available
+
+def find_nearest_state(state, state_space):
     """
-    Binarize CPU shares values.
+    Find the nearest matching state in the state space.
 
     Parameters:
-        cpu_shares (dict): Dictionary containing container IDs as keys and CPU shares lists as values.
+        state (tuple): The state to match.
+        state_space (list): The list of states in the state space.
 
     Returns:
-        list: List of binarized CPU shares lists.
+        tuple: The nearest matching state.
     """
-    binarized_cpu_shares = []
-    for shares_list in cpu_shares.values():
-        binarized_shares = [1 if share > 0 else 0 for share in shares_list]
-        binarized_cpu_shares.append(binarized_shares)
-    return binarized_cpu_shares
+    distances = [sum(abs(np.array(state) - np.array(s))) for s in state_space]
+    nearest_index = np.argmin(distances)
+    return state_space[nearest_index]
 
-if __name__ == "__main__":
-    """
-    The main method for this project
-    """
-    train_steps = 101
-    now = datetime.now()
-    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
-    print(f"Application Information:\nStart date & time:{dt_string}\nObservable service name:{service_name}\nContext urls:{url}, {application_url},\nTrain Steps = {train_steps}\n")
-    replicas_names = get_replica_names(service_name)
-    print(replicas_names)
-    mse_values = [] # Initialize empty list to store MSE values
-    rewards = []
-    replicas_count = []
-    save_path = '/plots' # Set the save path inside the container
-    validation_interval = 101 # Perform validation every 101 iterations
-    env = AutoscaleEnv(service_name, min_replicas, max_replicas, num_states)
-    obs = env.reset()
-    wperf = 0.90
-    wres = 0.09
-    wadp = 0.01
-    Rmax = 0.05
-    alpha = 0.5
-    gamma = 0.5
-    epsilon = 0.4
-    cres = 0.01
-    k_running_containers_next_state = 0
-    c_cpu_shares_next_state = None
-    mse_values = []
-    for iteration in range(1, train_steps):  # Run iterations
-        logger = logging.getLogger(__name__)  # Initialize a logger
-        print(f"\n--------Iteration No:{iteration}")  # Print the current iteration number
-        cpu_value, _, time_running, response_time, cpu_shares = fetch_data()  # Get CPU, RAM values and a placeholder value
-        R = response_time
-        print(f"Metrics: | CPU:{str(cpu_value)}% | Time Running:{str(time_running)}s | Response Time:{str(response_time)} | CPU Shares: {str(cpu_shares)}")  # Print metrics
-        observation = env._get_observation()
-        c_cpu_shares, u_cpu_utilzation, k_running_containers = state() # read the current state
-        #current_normalized_cpu_shares = binarize_cpu_shares(c_cpu_shares)
-        # a1_current_state = check_container_change(k_running_containers, k_running_containers_next_state) # the value of a1 (increased/decreased containers)
-        # a1_current_state = k_running_containers
-        # if c_cpu_shares_next_state is None:
-        #     cpu_share_changes = current_normalized_cpu_shares
-        # else:
-        #     cpu_share_changes = check_cpu_share_change(c_cpu_shares.values(), c_cpu_shares_next_state.values()) # Calculate a2 (CPU share change)
-        action = select_action(Q, epsilon) # Take action based on observation
-        print(f'action:{action}')
-        #a2_current_state = normalize_cpu_share_change(current_normalized_cpu_shares) # Normalize a2 in interval of [0,1] in CPU shares changes
-        a2_current_state = c_cpu_shares
-        current_state, cost, done, _ = env.step(action) # Take a step in the environment
-        print(f'System waits for {wait_time} seconds to retrieve the next state.')
-        time.sleep(wait_time)
-        c_cpu_shares_next_state, u_cpu_utilzation_next_state, k_running_containers_next_state = state() # read the next current state
-        #cpu_share_changes = check_cpu_share_change(c_cpu_shares.values(), c_cpu_shares_next_state.values()) # Calculate a2 (CPU share change)
-        #a2_next_state = normalize_cpu_share_change(cpu_share_changes) # Normalize a2 in interval of [0,1] in CPU shares changes
-        a2_next_state = c_cpu_shares_next_state
-        next_state = env._get_observation() # Observe the next state after the action is taken
-        # normalized_c_cpu_shares_next_state = binarize_cpu_shares(c_cpu_shares_next_state)
-        # normalized_c_cpu_shares_next_state = normalize_cpu_shares(normalized_c_cpu_shares_next_state)
-        
-        cost = Costs
-        total_cost = cost.overall_cost_function(wadp, 
-                                                wres, 
-                                                wperf, 
-                                                k_running_containers_next_state, 
-                                                u_cpu_utilzation_next_state,
-                                                c_cpu_shares_next_state, 
-                                                action, 
-                                                k_running_containers_next_state,
-                                                a2_next_state, 
-                                                Rmax,
-                                                10, 
-                                                R)
-        total_cost = round(total_cost, 5)
-        # current_normalized_cpu_shares = normalize_cpu_shares(current_normalized_cpu_shares)
-        a2_current_state = c_cpu_shares
-        a2_next_state = c_cpu_shares_next_state
-        current_state = (u_cpu_utilzation, a2_current_state, k_running_containers)
-        next_state = (u_cpu_utilzation_next_state, a2_next_state, k_running_containers_next_state)
-        current_state_action = (k_running_containers, a2_current_state)
-        next_state_action = (k_running_containers_next_state, a2_next_state)
-        print(f'total_cost:{total_cost}')
-        print(f'alpha:{alpha}')
-        print(f'gamma:{gamma}')
-        print(f'current_state:{current_state}')
-        print(f'next_state:{next_state}')
-        print(f'current_state_action:{current_state_action}')
-        print(f'next_state_action:{next_state_action}')
-        update_q_value(Q, total_cost, alpha, gamma, current_state, next_state, current_state_action, next_state_action)
-        max_cost_state = np.unravel_index(np.argmax(Q), Q.shape)
-        max_cost = np.max(Q)
-        # Print the highest cost state and its corresponding cost
-        print(f'Highest Cost State: {max_cost_state}')
-        print(f'Highest Cost: {max_cost}')
-        min_cost_state = np.unravel_index(np.argmin(Q), Q.shape)
-        min_cost = np.min(Q)
-        # Print the highest cost state and its corresponding cost
-        print(f'Lowest Cost State: {min_cost_state}')
-        print(f'Min Cost: {min_cost}')
-        iteration += 1
-        # Log Q-values & Log rewards
-        # print(f"Q-values: \n{Q}")
-        
-        # Calculate MSE and store in list
-        #mse = calculate_mse(Q, observation)
-        #mse_values.append(mse)
-        
-        # if iteration % 50 == 0:  # Save plot every 50 iterations
-        #     print("Plotting...")
-        #     plot_mse_values(range(1, iteration - 1), mse_values, save_path)
-        # np.save('/QSavedWeights/q_values.npy', Q)
-    else:  # If CPU or RAM values are None
-        print("No metrics available, wait...")  # Indicate no metrics available
+import numpy as np
+import matplotlib.pyplot as plt
+
+def q_learning(num_episodes):
+    episode = 0  # Initialize episode counter
+    costs_per_episode = []  # List to store total cost per episode
+    total_time_per_episode = []  # List to store total response time per episode
+    average_cost_per_episode = []  # List to store average reward per episode
+
+    while episode < num_episodes:
+        app_state = state()  # Initial state
+        total_cost = 0  # Initialize total cost for this episode
+        total_time = 0  # Initialize total time for this episode
+        total_reward = 0  # Initialize total reward for this episode
+        steps = 0  # Track the number of steps per episode
+
+        while True:
+            print(f'app_state: {app_state}')
+            nearest_state = find_nearest_state(app_state, state_space)
+            print(f'nearest_state: {nearest_state}')
+            # Select action using epsilon-greedy strategy
+            if np.random.uniform(0, 1) < epsilon:
+                action = np.random.choice(action_space)
+            else:
+                action = np.argmin(Q[state_space.index(nearest_state)])
+                action = np.clip(action, -1, 1)
+            print(f'action: {action}')
+            # Simulate state transition
+            next_state = transition(action)
+            print(f'next_state: {next_state}')
+            c_cpu_shares_next_state, u_cpu_utilzation_next_state, k_running_containers_next_state = next_state # read the next current state
+            a2_next_state = c_cpu_shares_next_state
+            cost = Costs
+            _, _, _, response_time, _ = fetch_data()  # Get CPU, RAM values and a placeholder value
+            R = response_time
+            step_cost = cost.overall_cost_function(wadp, 
+                                                   wres, 
+                                                   wperf, 
+                                                   k_running_containers_next_state, 
+                                                   u_cpu_utilzation_next_state,
+                                                   c_cpu_shares_next_state, 
+                                                   action, 
+                                                   k_running_containers_next_state,
+                                                   a2_next_state, 
+                                                   Rmax,
+                                                   10, 
+                                                   R)      
+            step_cost = round(step_cost, 5)
+            print(f'Response_time: {R}, Cost of action: {step_cost}')
+            total_cost += step_cost  # Accumulate the cost
+            total_time += R  # Accumulate the reward
+            steps += 1  # Increment step count
+
+            # Update Q-value using Bellman equation
+            Q[state_space.index(nearest_state)][action_space.index(action)] += alpha * \
+                (step_cost + gamma * np.min(Q[state_space.index(next_state)]) - Q[state_space.index(nearest_state)][action_space.index(action)])
+            # Move to next state
+            app_state = next_state
+            print(f'Episode: {episode + 1}')
+            # Check if the current episode should end
+            if app_state[2] == 9:  # Terminal state reached (maximum number of instances)
+                break
+
+        costs_per_episode.append(total_cost)  # Store total cost for this episode
+        total_time_per_episode.append(total_time)  # Store response for this episode
+        average_cost_per_episode.append(total_cost / steps)  # Store average reward for this episode
+        episode += 1
+
+    return costs_per_episode, total_time_per_episode, average_cost_per_episode
+
+# Run Q-learning
+num_episodes = 1000
+epsilon = 0.4  # Epsilon for epsilon-greedy strategy
+costs, total_time, avg_cost = q_learning(num_episodes)
+
+# Visualize the data
+plt.figure(figsize=(18, 6))
+
+# Plot total cost per episode
+plt.subplot(1, 3, 1)
+plt.plot(range(num_episodes), costs, label='Total Cost')
+plt.xlabel('Episode')
+plt.ylabel('Total Cost')
+plt.title('Total Cost per Episode')
+plt.legend()
+
+# Plot total reward per episode
+plt.subplot(1, 3, 2)
+plt.plot(range(num_episodes), total_time, label='Total Time')
+plt.xlabel('Episode')
+plt.ylabel('Total Time')
+plt.title('Total Time per Episode')
+plt.legend()
+
+# Plot average reward per episode
+plt.subplot(1, 3, 3)
+plt.plot(range(num_episodes), avg_cost, label='Average Cost')
+plt.xlabel('Episode')
+plt.ylabel('Average Cost')
+plt.title('Average Cost per Episode')
+plt.legend()
+
+# Save the figure to the mounted volume directory
+plt.tight_layout()
+plt.savefig('/plots/q_learning_performance.png')
+plt.close()
+
+# Print learned Q-values
+print("Learned Q-values:")
+print(Q)
+
+np.save('/QSavedWeights/Q_table.npy', Q)
+
+for state_idx, q_values in enumerate(Q):
+    favored_action = np.argmax(q_values)
+    print(f"For state {state_idx}, favored action is {favored_action}")
