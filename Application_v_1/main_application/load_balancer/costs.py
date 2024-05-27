@@ -14,16 +14,16 @@ def indicator_resource_performance(a1, a2, k_next_state, u_next_state, c_next_st
 
 class Costs:
     def overall_cost_function(wadp, wperf, wres, k_next_state, u_next_state, c_next_state, action, a1, a2, Rmax, Kmax, R):
-        action2_sum = sum(sum(inner_list) for inner_list in a2)
+        # action2_sum = sum(sum(inner_list) for inner_list in a2)
         # Term 1
         term1 = wadp * indicator_vertical_scaling(action)
-        print(f'term1:{term1}')
+        #print(f'term1:{term1}')
         # Term 2
-        term2 = wperf * indicator_resource_performance(a1, action2_sum, k_next_state, u_next_state, c_next_state, Rmax, R)
-        print(f'term2:{term2}')
+        term2 = wperf * indicator_resource_performance(a1, a2, k_next_state, u_next_state, c_next_state, Rmax, R)
+        #print(f'term2:{term2}')
         # Term 3
-        term3 = wres * (k_next_state + a1) * (c_next_state + action2_sum) / Kmax
-        print(f'term3:{term3}')
+        term3 = wres * (k_next_state + a1) * (c_next_state + a2) / Kmax
+        #print(f'term3:{term3}')
         # Overall cost
         cost = term1 + term2 + term3
         return cost
@@ -59,4 +59,3 @@ class Costs:
         resource_cost = w_res * (k_a1_term) * (c_a2_term) * c_res / max_replicas
         return resource_cost
     
-
