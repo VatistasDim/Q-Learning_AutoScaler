@@ -91,30 +91,37 @@ def scale_out_action(service_name, max_replicas):
 
     return current_replicas
 
-def scale_out(service_name, desired_replicas):
+def increase_cpu_shares(service_name, container_name, cpu_shares_increase):
     """
-    Scales out a service to the specified number of replicas.
-    """
-    client = docker.from_env()
-    service = client.services.get(service_name)
-    service.scale(desired_replicas)
-    print(f"Service '{service_name}' scaled to {desired_replicas} replicas.")
-    time.sleep(cooldownTimeInSec)
-
-def scale_in(service_name, scale_out_factor):
-    """
-    Scales in a service to the specified number of replicas.
+    Increases CPU shares for a container in a specified service.
 
     Args:
-        service_name (str): Name of the service to scale.
-        scale_out_factor (int): The number of replicas to scale in by.
+        service_name (str): Name of the Docker service.
+        container_name (str): Name of the container within the service.
+        cpu_shares_increase (int): The amount by which to increase CPU shares.
     """
     client = docker.from_env()
-    service = client.services.get(service_name)
-    current_replicas = get_current_replica_count(service_name)
-    desired_replicas = current_replicas - scale_out_factor
-    service.scale(desired_replicas)
-    time.sleep(cooldownTimeInSec)
+    container = client.services.get(service_name).tasks(filters={'name': container_name})[0]
+    current_cpu_shares = container['Spec']['Resources']['Limits']['NanoCPUs']
+    new_cpu_shares = current_cpu_shares + cpu_shares_increase
+    client.update_container_resources(container.id, limits={'NanoCPUs': new_cpu_shares})
+    print(f"CPU shares increased for container '{container_name}' in service '{service_name}' by {cpu_shares_increase}.")
+
+def decrease_cpu_shares(service_name, container_name, cpu_shares_decrease):
+    """
+    Decreases CPU shares for a container in a specified service.
+
+    Args:
+        service_name (str): Name of the Docker service.
+        container_name (str): Name of the container within the service.
+        cpu_shares_decrease (int): The amount by which to decrease CPU shares.
+    """
+    client = docker.from_env()
+    container = client.services.get(service_name).tasks(filters={'name': container_name})[0]
+    current_cpu_shares = container['Spec']['Resources']['Limits']['NanoCPUs']
+    new_cpu_shares = max(0, current_cpu_shares - cpu_shares_decrease)
+    client.update_container_resources(container.id, limits={'NanoCPUs': new_cpu_shares})
+    print(f"CPU shares decreased for container '{container_name}' in service '{service_name}' by {cpu_shares_decrease}.")
 
 
 def fetch_data():
