@@ -16,6 +16,9 @@ services:
         limits:
           cpus: "2"
           memory: 512M
+        reservations:
+          cpus: "0.512"
+          memory: 512M
       placement:
         constraints:
           - node.role == worker
@@ -57,8 +60,9 @@ services:
   load-balancer:
     image: load-balancer
     volumes:
-      - ~/vatistas/plots:/plots
+      - ~/vatistas/plots:/app/plots
       - ~/vatistas/QSavedWeights:/QSavedWeights
+      - ~/vatistas/logs:/logs
       - /var/run/docker.sock:/var/run/docker.sock
     deploy:
       restart_policy:
