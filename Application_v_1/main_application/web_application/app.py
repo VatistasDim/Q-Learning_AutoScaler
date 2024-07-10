@@ -1,34 +1,14 @@
-"""
-Flask Application with Prometheus Metrics and Endpoints.
-
-This application includes routes for rendering HTML templates, serving video files,
-and exposing a JSON endpoint. It also integrates Prometheus metrics for CPU usage,
-RAM usage, and running time.
-
-Metrics:
-- cpu_usage: Gauge metric tracking CPU usage.
-- ram_usage: Gauge metric tracking RAM usage.
-- running_time: Gauge metric tracking the running time of the application.
-
-Routes:
-- /: Renders the home.html template.
-- /about: Renders the about.html template.
-- /graphics: Renders the graphics.html template.
-- /streaming: Serves a video file (video_1.mp4) for streaming.
-- /json_endpoint: Exposes a JSON endpoint, reading data from data.json.
-
-"""
-
 from flask import Flask, render_template, send_file, jsonify, request
-from prometheus_client import start_http_server, Gauge, generate_latest
-import time, psutil, threading, json, os
+from prometheus_client import start_http_server, Gauge, Histogram, generate_latest
+import time, psutil, threading, json
 
-
+# Define Prometheus metrics
 cpu_usage_gauge = Gauge('cpu_usage', 'CPU_Usage')
 ram_usage_gauge = Gauge('ram_usage', 'Ram_Usage')
 running_time_gauge = Gauge('running_time', 'Running Time')
-response_time_gauge = Gauge('response_time', 'Response Time')
 cpu_shares_gauge = Gauge('cpu_shares', 'CPU Shares')
+json_endpoint_histogram = Histogram('json_endpoint_response_time_seconds', 'Response time for JSON endpoint in seconds')
+
 start_time = time.time()
 
 app = Flask(__name__)
@@ -101,12 +81,12 @@ def after_request(response):
     Returns:
         flask.Response: The modified response object.
     """
-    response_time = (time.time() - request.start_time)  # Elapsed time in seconds
-    response_time_gauge.set(response_time)
-
-    # Generate latest Prometheus metrics and reset response_time_gauge to 0
-    generate_latest()
-    response_time_gauge.set(0)
+    response_time = time.time() - request.start_time  # Elapsed time in seconds
+    
+    # Check if the request path is for the JSON endpoint
+    if request.path == '/json_endpoint':
+        json_endpoint_histogram.observe(response_time)
+        print(f"JSON endpoint response time: {response_time} seconds")
 
     return response
 
@@ -168,7 +148,7 @@ def json_endpoint():
         return jsonify({'error': 'JSON file not found'}), 404
     except json.JSONDecodeError:
         return jsonify({'error': 'Error decoding JSON file'}), 500
-    
+
 if __name__ == '__main__':
     metric_update_thread = threading.Thread(target=update_metrics)
     metric_update_thread.daemon = True
