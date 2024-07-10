@@ -23,7 +23,7 @@ timezone = pytz.timezone('Europe/Athens')
 wperf = 0.90
 wres = 0.09
 wadp = 0.01
-Rmax = 0.05
+Rmax = 0.5 #This is in ms
 alpha = 0.5
 gamma = 0.5
 epsilon = 0.4
@@ -118,7 +118,7 @@ def fetch_data():
                 cpu_percent = int(float(cpu_percent))
                 ram_percent = int(float(ram_percent))
                 time_up = int(float(time_up))
-                response_time = int(float(response_time))
+                response_time = float(response_time)
                 cpu_shares = calculate_cpu_shares(get_current_cpu_shares(service_name))
                 if None in (cpu_percent, ram_percent, time_up, response_time, cpu_shares):
                     continue

@@ -55,7 +55,7 @@ def get_service_up_time(url):
         return None
 
 def get_response_time(url):
-    params = {'query': 'sum(flask_request_processing_time_seconds{job="swarm-service"})'}
+    params = {'query': 'rate(json_endpoint_response_time_seconds_sum[1m]) / rate(json_endpoint_response_time_seconds_count[1m])'}
     try:
         response = requests.get(url, params=params)
         if response.status_code == 200:
