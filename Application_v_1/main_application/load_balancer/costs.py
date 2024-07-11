@@ -1,6 +1,5 @@
 #the adaptation cost cadp, which accounts for the application unavailability following an adaptation.
 
-
 def is_vertical_scaling(action):
     return action != 0 and action != 2
 

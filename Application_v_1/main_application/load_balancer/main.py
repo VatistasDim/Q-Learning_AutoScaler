@@ -34,8 +34,6 @@ service_name = 'mystack_application'
 application_url = 'http://application:8501/train'
 max_replicas = 10
 min_replicas = 1
-max_cpu_shares = 1024
-num_states = 3
 w_perf = 0.5  # Weight assigned to the performance penalty term in the cost function
 w_res = 0.4  # Determines the importance of the resource cost in the overall cost calculation
 max_containers = 11
@@ -71,10 +69,10 @@ def transition(action):
         print("Log: Increase Container by 1")
         desired_replicas = running_containers + 1
         scale_out(service_name=service_name, desired_replicas=desired_replicas)
-    elif action == -512 and current_cpu_shares > 0.25:  # Decrease CPU shares
+    elif action == -512:  # Decrease CPU shares
         print("Log: Decrease CPU shares")
         decrease_cpu_share_step(current_cpu_share = current_cpu_shares)
-    elif action == 512 and current_cpu_shares < 2:  # Increase CPU shares       
+    elif action == 512:  # Increase CPU shares       
         print("Log: Increase CPU shares")
         increase_cpu_share_step(current_cpu_share = current_cpu_shares)
     elif action == 0:
@@ -87,20 +85,18 @@ def transition(action):
     return (c, u, k)
 
 def increase_cpu_share_step(current_cpu_share):
-    print(f'---increase_cpu_share_step --> current_cpu_share:{current_cpu_share}')
+    print(f'Log: increase_cpu_share_step --> current_cpu_share:{current_cpu_share}')
     if current_cpu_share == 1:
         set_cpu_shares(service_name, 2.0)
     elif current_cpu_share == 2:
         print(f"Log: No Increase, already at max cpu shares")
 
 def decrease_cpu_share_step(current_cpu_share):
-    print(f'---decrease_cpu_share_step --> current_cpu_share:{current_cpu_share}')
+    print(f'Log: decrease_cpu_share_step --> current_cpu_share:{current_cpu_share}')
     if current_cpu_share == 2:
-        set_cpu_shares(service_name, 1)
+        set_cpu_shares(service_name, 1.0)
     elif current_cpu_share == 1:
-        print("Log: No decreate in cpu shares, already at lowest cpu shares")
-    new_cpu_shares = get_current_cpu_shares(service_name)
-    print(f'---New CPU Shares after decrease: {new_cpu_shares}')
+        print("Log: No decrease in cpu shares, already at lowest cpu shares")
 
 def select_action(Q, state, epsilon):
     if np.random.uniform(0, 1) < epsilon:
@@ -279,31 +275,66 @@ def run_q_learning(num_episodes):
             current_state = next_state
             nearest_state = find_nearest_state(current_state, state_space)
             action = select_action(Q, nearest_state, epsilon)
-            next_state = transition(action)
+            next_state = transition(action) #c, u, k
             _, _, _, performance_penalty, _ = fetch_data()
-            if performance_penalty is not None:
-                performance_penalty = performance_penalty - 0.50
-            else:
+            
+            if performance_penalty is None:
                 print("Error: Performance penalty is None. Skipping calculation.")
                 performance_penalty = 0
+                break
             
             resource_cost = cres * float(next_state[2])
-            if performance_penalty < 0:
-                performance_penalty = 0
-            total_cost += w_perf * performance_penalty + w_res * resource_cost
+            # if performance_penalty < 0:
+            #     performance_penalty = 0
+            
+            if action == 1 or action == -1:
+                a1 = 1
+            else:
+                a1 = 0
+            
+            if action == -512 or action == 512:
+                a2 = 1
+            else:
+                a2 = 0
+            
+            total_cost += Costs.overall_cost_function(wadp, 
+                                                      w_perf, 
+                                                      w_res,
+                                                      next_state[2], 
+                                                      next_state[1], 
+                                                      next_state[0], 
+                                                      action, 
+                                                      a1, 
+                                                      a2, 
+                                                      Rmax, 
+                                                      max_replicas, 
+                                                      performance_penalty)
+            
+            print(f'Log: Total Cost: {total_cost}, action: {action}')
+            
             total_time += (datetime.now() - start_time).total_seconds()
+            
             total_reward += total_cost
+            
             total_cpu_utilization += current_state[1]
+            
             total_cpu_shares += current_state[0]
+            
             total_containers += current_state[2]
+           
             _, _, _, total_response_time, _ = fetch_data()
+            
             steps += 1
+            
             adaptation_count += 1
+            
             if performance_penalty > Rmax:
                 Rmax_violation_count += 1
 
             current_state_idx = state_space.index(nearest_state)
+            
             next_state_idx = state_space.index(find_nearest_state(next_state, state_space))
+            
             Q[current_state_idx, action_space.index(action)] = (1 - alpha) * Q[current_state_idx, action_space.index(action)] + alpha * (total_reward + gamma * min(Q[next_state_idx, :]))
             
             # Calculate ETA
