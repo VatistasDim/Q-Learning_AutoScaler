@@ -448,8 +448,11 @@ def save_final_statistics(statistics, filename):
         log_file.write(statistics)
 
 if __name__ == '__main__':
-    num_episodes = 300
+    
+    num_episodes = 60
 
+    baseline = False
+    
     # Run Q-learning and gather metrics
     q_learning_metrics = run_q_learning(num_episodes)
     
@@ -489,39 +492,40 @@ if __name__ == '__main__':
 
     # Reset the environment to its initial state
     reset_environment_to_initial_state()
-
-    # Run baseline scenario (without Q-learning) and gather metrics
-    baseline_metrics = run_baseline(num_episodes)
     
-    # Extract metrics
-    costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations, average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts = baseline_metrics
+    if baseline:
+        # Run baseline scenario (without Q-learning) and gather metrics
+        baseline_metrics = run_baseline(num_episodes)
+        
+        # Extract metrics
+        costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations, average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts = baseline_metrics
 
-    # Plot and save baseline results
-    plot_metric(iterations, costs_per_episode, 'Total Cost', 'Total Cost per Episode (Baseline)', '/app/plots/total_cost_per_episode_baseline.png')
-    plot_metric(iterations, total_time_per_episode, 'Total Time', 'Total Time per Episode (Baseline)', '/app/plots/total_time_per_episode_baseline.png')
-    plot_metric(iterations, average_cost_per_episode, 'Average Cost', 'Average Cost per Episode (Baseline)', '/app/plots/average_cost_per_episode_baseline.png')
-    plot_metric(iterations, Rmax_violations, 'Rmax Violations (%)', 'Rmax Violations per Episode (Baseline)', '/app/plots/rmax_violations_per_episode_baseline.png')
-    plot_metric(iterations, average_cpu_utilization, 'Average CPU Utilization (%)', 'Average CPU Utilization per Episode (Baseline)', '/app/plots/average_cpu_utilization_per_episode_baseline.png')
-    plot_metric(iterations, average_cpu_shares, 'Average CPU Shares (%)', 'Average CPU Shares per Episode (Baseline)', '/app/plots/average_cpu_shares_per_episode_baseline.png')
-    plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode (Baseline)', '/app/plots/average_num_containers_per_episode_baseline.png')
-    plot_metric(iterations, average_response_time, 'Average Response Time (ms)', 'Average Response Time per Episode (Baseline)', '/app/plots/average_response_time_per_episode_baseline.png')
-    plot_metric(iterations, adaptation_counts, 'Adaptations (%)', 'Adaptations per Episode (Baseline)', '/app/plots/adaptations_per_episode_baseline.png')
+        # Plot and save baseline results
+        plot_metric(iterations, costs_per_episode, 'Total Cost', 'Total Cost per Episode (Baseline)', '/app/plots/total_cost_per_episode_baseline.png')
+        plot_metric(iterations, total_time_per_episode, 'Total Time', 'Total Time per Episode (Baseline)', '/app/plots/total_time_per_episode_baseline.png')
+        plot_metric(iterations, average_cost_per_episode, 'Average Cost', 'Average Cost per Episode (Baseline)', '/app/plots/average_cost_per_episode_baseline.png')
+        plot_metric(iterations, Rmax_violations, 'Rmax Violations (%)', 'Rmax Violations per Episode (Baseline)', '/app/plots/rmax_violations_per_episode_baseline.png')
+        plot_metric(iterations, average_cpu_utilization, 'Average CPU Utilization (%)', 'Average CPU Utilization per Episode (Baseline)', '/app/plots/average_cpu_utilization_per_episode_baseline.png')
+        plot_metric(iterations, average_cpu_shares, 'Average CPU Shares (%)', 'Average CPU Shares per Episode (Baseline)', '/app/plots/average_cpu_shares_per_episode_baseline.png')
+        plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode (Baseline)', '/app/plots/average_num_containers_per_episode_baseline.png')
+        plot_metric(iterations, average_response_time, 'Average Response Time (ms)', 'Average Response Time per Episode (Baseline)', '/app/plots/average_response_time_per_episode_baseline.png')
+        plot_metric(iterations, adaptation_counts, 'Adaptations (%)', 'Adaptations per Episode (Baseline)', '/app/plots/adaptations_per_episode_baseline.png')
 
-    # Prepare final episode statistics for baseline
-    baseline_statistics = (
-        f"Baseline Final Episode Statistics:\n"
-        f"Rmax Violations: {Rmax_violations[-1] * 100 / num_episodes:.2f}%\n"
-        f"Average CPU Utilization: {average_cpu_utilization[-1]:.2f}%\n"
-        f"Average CPU Shares: {average_cpu_shares[-1]:.2f}%\n"
-        f"Average Number of Containers: {average_num_containers[-1]:.2f}\n"
-        f"Average Response Time: {average_response_time[-1]:.2f} ms\n"
-        f"Adaptations: {adaptation_counts[-1] * 100 / num_episodes:.2f}%\n"
-    )
+        # Prepare final episode statistics for baseline
+        baseline_statistics = (
+            f"Baseline Final Episode Statistics:\n"
+            f"Rmax Violations: {Rmax_violations[-1] * 100 / num_episodes:.2f}%\n"
+            f"Average CPU Utilization: {average_cpu_utilization[-1]:.2f}%\n"
+            f"Average CPU Shares: {average_cpu_shares[-1]:.2f}%\n"
+            f"Average Number of Containers: {average_num_containers[-1]:.2f}\n"
+            f"Average Response Time: {average_response_time[-1]:.2f} ms\n"
+            f"Adaptations: {adaptation_counts[-1] * 100 / num_episodes:.2f}%\n"
+        )
 
-    # Save final episode statistics for baseline to a log file
-    baseline_log_path = '/logs/baseline-final-log.txt'
-    save_final_statistics(baseline_statistics, baseline_log_path)
-    print(baseline_statistics)
+        # Save final episode statistics for baseline to a log file
+        baseline_log_path = '/logs/baseline-final-log.txt'
+        save_final_statistics(baseline_statistics, baseline_log_path)
+        print(baseline_statistics)
 
-    # Show the last plot (optional)
-    plt.show()
+        # Show the last plot (optional)
+        plt.show()
