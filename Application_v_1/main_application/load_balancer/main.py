@@ -272,20 +272,26 @@ def run_q_learning(num_episodes):
         start_time = datetime.now()
 
         while True:
+            
             current_state = next_state
+            
             nearest_state = find_nearest_state(current_state, state_space)
+            
             action = select_action(Q, nearest_state, epsilon)
+            
             next_state = transition(action) #c, u, k
+            
             _, _, _, performance_penalty, _ = fetch_data()
             
             if performance_penalty is None:
+                
                 print("Error: Performance penalty is None. Skipping calculation.")
+                
                 performance_penalty = 0
+                
                 break
             
             resource_cost = cres * float(next_state[2])
-            # if performance_penalty < 0:
-            #     performance_penalty = 0
             
             if action == 1 or action == -1:
                 a1 = 1
@@ -326,7 +332,10 @@ def run_q_learning(num_episodes):
             
             steps += 1
             
-            adaptation_count += 1
+            if action != 0:
+                adaptation_count += 1
+            else:
+                adaptation_count += 0
             
             if performance_penalty > Rmax:
                 Rmax_violation_count += 1
@@ -374,7 +383,6 @@ def run_baseline(num_episodes):
     average_num_containers = []
     average_response_time = []
     adaptation_counts = []
-    total_episodes = num_episodes
 
     while episode <= num_episodes:
         app_state = state()
@@ -392,9 +400,13 @@ def run_baseline(num_episodes):
         start_time = datetime.now()
 
         while True:
+            
             current_state = next_state
+            
             next_state = transition(None)  # No Q-learning action selection
+            
             _, _, _, performance_penalty, _ = fetch_data()
+            
             if performance_penalty is not None:
                 performance_penalty = performance_penalty - 0.50
             else:
@@ -402,17 +414,28 @@ def run_baseline(num_episodes):
                 performance_penalty = 0
 
             resource_cost = cres * float(next_state[2])
+            
             if performance_penalty < 0:
                 performance_penalty = 0
+            
             total_cost += w_perf * performance_penalty + w_res * resource_cost
+            
             total_time += (datetime.now() - start_time).total_seconds()
+            
             total_reward += total_cost
+            
             total_cpu_utilization += current_state[1]
+            
             total_cpu_shares += current_state[0]
+            
             total_containers += current_state[2]
+            
             _, _, _, total_response_time, _ = fetch_data()
+            
             steps += 1
+            
             adaptation_count += 1
+            
             if performance_penalty > Rmax:
                 Rmax_violation_count += 1
 
