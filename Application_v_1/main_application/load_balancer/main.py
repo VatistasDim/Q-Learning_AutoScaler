@@ -29,7 +29,6 @@ gamma = 0.5
 epsilon = 0.4
 cres = 0.01
 wait_time = 15
-was_transition_succefull = True
 url = 'http://prometheus:9090/api/v1/query'
 service_name = 'mystack_application'
 application_url = 'http://application:8501/train'
@@ -59,31 +58,34 @@ def reset_environment_to_initial_state():
     set_cpu_shares(service_name, 2.0)
 
 def transition(action):
+    global was_transition_succefull  # Declare the global variable
     running_containers = get_current_replica_count(service_prefix=service_name)
     current_cpu_shares = get_current_cpu_shares(service_name)
     print(f"Log: Current CPU shares from transition: {current_cpu_shares}")
 
     if action == -1:  # Scale in (decrease containers)
         print("Log: Decrease Container by 1")
-        was_transition_succefull = scale_in(service_name=service_name, scale_out_factor=1) 
+        was_transition_succefull = scale_in(service_name=service_name, scale_out_factor=1)
     elif action == 1:  # Scale out (increase containers)
         print("Log: Increase Container by 1")
         desired_replicas = running_containers + 1
         was_transition_succefull = scale_out(service_name=service_name, desired_replicas=desired_replicas)
     elif action == -512:  # Decrease CPU shares
         print("Log: Decrease CPU shares")
-        was_transition_succefull = decrease_cpu_share_step(current_cpu_share = current_cpu_shares)
+        was_transition_succefull = decrease_cpu_share_step(current_cpu_share=current_cpu_shares)
     elif action == 512:  # Increase CPU shares
         print("Log: Increase CPU shares")
-        was_transition_succefull = increase_cpu_share_step(current_cpu_share = current_cpu_shares)
+        was_transition_succefull = increase_cpu_share_step(current_cpu_share=current_cpu_shares)
     elif action == 0:
         print("Log: No Action")
         time.sleep(15)
+        was_transition_succefull = True
 
     c, u, k = state()
     new_cpu_shares = get_current_cpu_shares(service_name)
     print(f"Log: New CPU shares after action: {new_cpu_shares}")
     return (c, u, k)
+
 
 def increase_cpu_share_step(current_cpu_share):
     print(f'Log: increase_cpu_share_step --> current_cpu_share:{current_cpu_share}')
