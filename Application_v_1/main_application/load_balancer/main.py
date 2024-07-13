@@ -58,6 +58,7 @@ def reset_environment_to_initial_state():
     set_cpu_shares(service_name, 2.0)
 
 def transition(action):
+    was_transition_succefull = True
     running_containers = get_current_replica_count(service_prefix=service_name)
     current_cpu_shares = get_current_cpu_shares(service_name)
     print(f"Log: Current CPU shares from transition: {current_cpu_shares}")
@@ -65,16 +66,24 @@ def transition(action):
     if action == -1 and running_containers > 1:  # Scale in (decrease containers)
         print("Log: Decrease Container by 1")
         scale_in(service_name=service_name, scale_out_factor=1)
-    elif action == 1 and running_containers < max_replicas:  # Scale out (increase containers)
+    else:
+        print("Log: Decreasing container is not possible, because lowest point has been reached")
+        was_transition_succefull = False
+        
+    if action == 1 and running_containers < max_replicas:  # Scale out (increase containers)
         print("Log: Increase Container by 1")
         desired_replicas = running_containers + 1
         scale_out(service_name=service_name, desired_replicas=desired_replicas)
-    elif action == -512:  # Decrease CPU shares
+    else:
+        print("Log: Increasing container is not possible, because highest point has been reached")
+        was_transition_succefull = False
+    
+    if action == -512:  # Decrease CPU shares
         print("Log: Decrease CPU shares")
-        decrease_cpu_share_step(current_cpu_share = current_cpu_shares)
+        was_transition_succefull = decrease_cpu_share_step(current_cpu_share = current_cpu_shares)
     elif action == 512:  # Increase CPU shares       
         print("Log: Increase CPU shares")
-        increase_cpu_share_step(current_cpu_share = current_cpu_shares)
+        was_transition_succefull = increase_cpu_share_step(current_cpu_share = current_cpu_shares)
     elif action == 0:
         print("Log: No Action")
         time.sleep(15)
@@ -82,21 +91,25 @@ def transition(action):
     c, u, k = state()
     new_cpu_shares = get_current_cpu_shares(service_name)
     print(f"Log: New CPU shares after action: {new_cpu_shares}")
-    return (c, u, k)
+    return (c, u, k, was_transition_succefull)
 
 def increase_cpu_share_step(current_cpu_share):
     print(f'Log: increase_cpu_share_step --> current_cpu_share:{current_cpu_share}')
     if current_cpu_share == 1:
         set_cpu_shares(service_name, 2.0)
+        return True
     elif current_cpu_share == 2:
         print(f"Log: No Increase, already at max cpu shares")
+        return False
 
 def decrease_cpu_share_step(current_cpu_share):
     print(f'Log: decrease_cpu_share_step --> current_cpu_share:{current_cpu_share}')
     if current_cpu_share == 2:
         set_cpu_shares(service_name, 1.0)
+        return True
     elif current_cpu_share == 1:
         print("Log: No decrease in cpu shares, already at lowest cpu shares")
+        return False
 
 def select_action(Q, state, epsilon):
     if np.random.uniform(0, 1) < epsilon:
@@ -254,8 +267,11 @@ def run_q_learning(num_episodes):
     average_num_containers = []
     average_response_time = []
     adaptation_counts = []
+    
+    print("Log: Training Starting ... \n")
 
     while episode <= num_episodes:
+        print(f'\n\n Log: Epidose: {episode}')
         app_state = state()
         total_cost = 0
         total_time = 0
@@ -271,11 +287,14 @@ def run_q_learning(num_episodes):
         start_time = datetime.now()
 
         while True:
+            print("\n")
             current_state = next_state
-            
             nearest_state = find_nearest_state(current_state, state_space)
             action = select_action(Q, nearest_state, epsilon)
             next_state = transition(action)
+            
+            if next_state[3] == False:
+                performance_penalty = 100
             
             fetched_data = fetch_data()  # Fetch data once per iteration
             if fetched_data[3] is None:
