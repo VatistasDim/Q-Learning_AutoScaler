@@ -275,7 +275,7 @@ def run_q_learning(num_episodes):
     print("Log: Training Starting ... \n")
 
     while episode <= num_episodes:
-        print(f'\n\n Log: Epidose: {episode}')
+        print(f'\n Log: Epidose: {episode}')
         app_state = state()
         total_cost = 0
         total_time = 0
@@ -291,6 +291,7 @@ def run_q_learning(num_episodes):
         start_time = datetime.now()
 
         while True:
+            elapsed_time = (datetime.now() - start_time).total_seconds()
             print("\n")
             current_state = next_state
             nearest_state = find_nearest_state(current_state, state_space)
@@ -308,16 +309,13 @@ def run_q_learning(num_episodes):
             resource_cost = cres * float(next_state[2])
             a1 = 1 if action in [1, -1] else 0
             a2 = 1 if action in [-512, 512] else 0
-            
-            if was_transition_succefull == False:
-                performance_penalty = 100
-            total_cost += Costs.overall_cost_function(wadp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)
-            
-            print(f'Log: Total Cost: {total_cost}, action: {action}')
-            
-            elapsed_time = (datetime.now() - start_time).total_seconds()
-            total_time += elapsed_time  # Update total time
-            
+            cost = Costs.overall_cost_function(wadp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)
+            print(f'Log: Cost: {cost}, action: {action}')
+            if was_transition_succefull:
+                print('Info: Cost will be affected by 10 because no transition was made.')
+                cost = 100
+            total_cost += cost
+            print(f'Total Cost: {total_cost}')
             total_reward += total_cost
             total_cpu_utilization += current_state[1]
             total_cpu_shares += current_state[0]
@@ -337,9 +335,10 @@ def run_q_learning(num_episodes):
             
             Q[current_state_idx, action_space.index(action)] = (
                 (1 - alpha) * Q[current_state_idx, action_space.index(action)] +
-                alpha * (total_reward + gamma * min(Q[next_state_idx, :]))
+                alpha * (cost + gamma * min(Q[next_state_idx, :]))
             )
             
+            total_time += elapsed_time
             # Calculate ETA
             remaining_episodes = num_episodes - episode
             average_time_per_episode = total_time / episode if episode > 0 else 0
