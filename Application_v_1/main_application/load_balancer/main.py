@@ -310,11 +310,11 @@ def run_q_learning(num_episodes):
             a1 = 1 if action in [1, -1] else 0
             a2 = 1 if action in [-512, 512] else 0
             cost = Costs.overall_cost_function(wadp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)
-            print(f'Log: Cost: {cost}, action: {action}')
             if was_transition_succefull:
                 print('Info: Cost will be affected by 10 because no transition was made.')
                 cost = 100
             total_cost += cost
+            print(f'Log: Cost: {cost}, action: {action}')
             print(f'Total Cost: {total_cost}')
             total_reward += total_cost
             total_cpu_utilization += current_state[1]
