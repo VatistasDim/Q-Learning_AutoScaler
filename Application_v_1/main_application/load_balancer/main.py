@@ -20,8 +20,8 @@ if not os.path.exists(log_dir):
 
 # Constants
 timezone = pytz.timezone('Europe/Athens')
-wperf = 0.90
-wres = 0.09
+wperf = 0.09
+wres = 0.90
 wadp = 0.01
 Rmax = 0.5 #This is in ms
 alpha = 0.5
@@ -254,7 +254,6 @@ def run_q_learning(num_episodes):
     average_num_containers = []
     average_response_time = []
     adaptation_counts = []
-    total_episodes = num_episodes
 
     while episode <= num_episodes:
         app_state = state()
@@ -272,82 +271,55 @@ def run_q_learning(num_episodes):
         start_time = datetime.now()
 
         while True:
-            
             current_state = next_state
             
             nearest_state = find_nearest_state(current_state, state_space)
-            
             action = select_action(Q, nearest_state, epsilon)
+            next_state = transition(action)
             
-            next_state = transition(action) #c, u, k
-            
-            _, _, _, performance_penalty, _ = fetch_data()
-            
-            if performance_penalty is None:
-                
+            fetched_data = fetch_data()  # Fetch data once per iteration
+            if fetched_data[3] is None:
                 print("Error: Performance penalty is None. Skipping calculation.")
-                
                 performance_penalty = 0
-                
                 break
-            
+            else:
+                _, _, _, performance_penalty, _ = fetched_data
+
             resource_cost = cres * float(next_state[2])
+            a1 = 1 if action in [1, -1] else 0
+            a2 = 1 if action in [-512, 512] else 0
             
-            if action == 1 or action == -1:
-                a1 = 1
-            else:
-                a1 = 0
-            
-            if action == -512 or action == 512:
-                a2 = 1
-            else:
-                a2 = 0
-            
-            total_cost += Costs.overall_cost_function(wadp, 
-                                                      w_perf, 
-                                                      w_res,
-                                                      next_state[2], 
-                                                      next_state[1], 
-                                                      next_state[0], 
-                                                      action, 
-                                                      a1, 
-                                                      a2, 
-                                                      Rmax, 
-                                                      max_replicas, 
-                                                      performance_penalty)
+            total_cost += Costs.overall_cost_function(wadp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)
             
             print(f'Log: Total Cost: {total_cost}, action: {action}')
             
-            total_time += (datetime.now() - start_time).total_seconds()
+            elapsed_time = (datetime.now() - start_time).total_seconds()
+            total_time += elapsed_time  # Update total time
             
-            total_reward += total_cost
-            
+            total_reward += total_cost  # This may need to be a different calculation based on rewards
             total_cpu_utilization += current_state[1]
-            
             total_cpu_shares += current_state[0]
-            
             total_containers += current_state[2]
-           
-            _, _, _, total_response_time, _ = fetch_data()
+            total_response_time += fetched_data[3]  # Assuming response time is in the fetched data
             
             steps += 1
             
             if action != 0:
                 adaptation_count += 1
-            else:
-                adaptation_count += 0
             
             if performance_penalty > Rmax:
                 Rmax_violation_count += 1
 
             current_state_idx = state_space.index(nearest_state)
-            
             next_state_idx = state_space.index(find_nearest_state(next_state, state_space))
             
-            Q[current_state_idx, action_space.index(action)] = (1 - alpha) * Q[current_state_idx, action_space.index(action)] + alpha * (total_reward + gamma * min(Q[next_state_idx, :]))
+            Q[current_state_idx, action_space.index(action)] = (
+                (1 - alpha) * Q[current_state_idx, action_space.index(action)] +
+                alpha * (total_reward + gamma * min(Q[next_state_idx, :]))
+            )
             
             # Calculate ETA
-            remaining_episodes = total_episodes - episode
+            remaining_episodes = num_episodes - episode
             average_time_per_episode = total_time / episode if episode > 0 else 0
             remaining_time = remaining_episodes * average_time_per_episode
             eta = datetime.now() + timedelta(seconds=remaining_time)
@@ -356,21 +328,22 @@ def run_q_learning(num_episodes):
 
             print(f"Log: Episode: {episode}, ETA: {eta_athens}")
 
-            if datetime.now() - start_time > timedelta(minutes=1):
-                break
+            if elapsed_time > 60:
+                break  # Breaking if elapsed time is more than 1 minute
 
         episode += 1
         costs_per_episode.append(total_cost / steps)
-        total_time_per_episode.append(total_time)
+        total_time_per_episode.append(total_time / steps)
         average_cost_per_episode.append(total_reward / steps)
         Rmax_violations.append(Rmax_violation_count)
         average_cpu_utilization.append(total_cpu_utilization / steps)
         average_cpu_shares.append(total_cpu_shares / steps)
         average_num_containers.append(total_containers / steps)
         average_response_time.append(total_response_time / steps)
-        adaptation_counts.append(adaptation_count)
+        adaptation_counts.append(adaptation_count / steps)
 
-    return costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations, average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts
+    return (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
+            average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts)
 
 def run_baseline(num_episodes):
     episode = 1
@@ -444,14 +417,14 @@ def run_baseline(num_episodes):
 
         episode += 1
         costs_per_episode.append(total_cost / steps)
-        total_time_per_episode.append(total_time)
+        total_time_per_episode.append(total_time / steps)
         average_cost_per_episode.append(total_reward / steps)
         Rmax_violations.append(Rmax_violation_count)
         average_cpu_utilization.append(total_cpu_utilization / steps)
         average_cpu_shares.append(total_cpu_shares / steps)
         average_num_containers.append(total_containers / steps)
         average_response_time.append(total_response_time / steps)
-        adaptation_counts.append(adaptation_count)
+        adaptation_counts.append(adaptation_count / steps)
 
     return costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations, average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts
 
@@ -472,7 +445,7 @@ def save_final_statistics(statistics, filename):
 
 if __name__ == '__main__':
     
-    num_episodes = 60
+    num_episodes = 3
 
     baseline = False
     
@@ -480,7 +453,8 @@ if __name__ == '__main__':
     q_learning_metrics = run_q_learning(num_episodes)
     
     # Extract metrics
-    costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations, average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts = q_learning_metrics
+    (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
+    average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts) = q_learning_metrics
     
     # Plot and save Q-learning results
     num_iterations = len(costs_per_episode)
@@ -499,6 +473,8 @@ if __name__ == '__main__':
     # Prepare final episode statistics
     q_learning_statistics = (
         f"Q-learning Final Episode Statistics:\n"
+        f"Estimated Running Time: {num_episodes} in minutes\n"
+        f"Wperf = {wperf}, Wres = {wres}, Wadp = {wadp}, Rmax = {Rmax}\n"
         f"Rmax Violations: {Rmax_violations[-1] * 100 / num_episodes:.2f}%\n"
         f"Average CPU Utilization: {average_cpu_utilization[-1]:.2f}%\n"
         f"Average CPU Shares: {average_cpu_shares[-1]:.2f}%\n"
