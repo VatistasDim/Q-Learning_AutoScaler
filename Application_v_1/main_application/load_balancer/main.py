@@ -108,7 +108,7 @@ def select_action(Q, state, epsilon):
         return np.random.choice(action_space)
     else:
         state_idx = state_space.index(state)
-        return action_space[np.argmax(Q[state_idx])]
+        return action_space[np.argmin(Q[state_idx])]
 
 def fetch_data():
     max_attempts = 3
