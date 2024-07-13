@@ -29,6 +29,7 @@ gamma = 0.5
 epsilon = 0.4
 cres = 0.01
 wait_time = 15
+was_transition_succefull = True
 url = 'http://prometheus:9090/api/v1/query'
 service_name = 'mystack_application'
 application_url = 'http://application:8501/train'
@@ -91,7 +92,7 @@ def transition(action):
     c, u, k = state()
     new_cpu_shares = get_current_cpu_shares(service_name)
     print(f"Log: New CPU shares after action: {new_cpu_shares}")
-    return (c, u, k, was_transition_succefull)
+    return (c, u, k)
 
 def increase_cpu_share_step(current_cpu_share):
     print(f'Log: increase_cpu_share_step --> current_cpu_share:{current_cpu_share}')
@@ -293,7 +294,7 @@ def run_q_learning(num_episodes):
             action = select_action(Q, nearest_state, epsilon)
             next_state = transition(action)
             
-            if next_state[3] == False:
+            if was_transition_succefull == False:
                 performance_penalty = 100
             
             fetched_data = fetch_data()  # Fetch data once per iteration
