@@ -294,9 +294,6 @@ def run_q_learning(num_episodes):
             action = select_action(Q, nearest_state, epsilon)
             next_state = transition(action)
             
-            if was_transition_succefull == False:
-                performance_penalty = 100
-            
             fetched_data = fetch_data()  # Fetch data once per iteration
             if fetched_data[3] is None:
                 print("Error: Performance penalty is None. Skipping calculation.")
@@ -316,11 +313,14 @@ def run_q_learning(num_episodes):
             elapsed_time = (datetime.now() - start_time).total_seconds()
             total_time += elapsed_time  # Update total time
             
-            total_reward += total_cost  # This may need to be a different calculation based on rewards
+            if was_transition_succefull == True:
+                total_reward += total_cost
+            else:
+                total_reward += 100 
             total_cpu_utilization += current_state[1]
             total_cpu_shares += current_state[0]
             total_containers += current_state[2]
-            total_response_time += fetched_data[3]  # Assuming response time is in the fetched data
+            total_response_time += fetched_data[3]
             
             steps += 1
             
