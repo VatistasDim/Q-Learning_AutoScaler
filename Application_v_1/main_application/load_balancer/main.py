@@ -59,30 +59,21 @@ def reset_environment_to_initial_state():
     set_cpu_shares(service_name, 2.0)
 
 def transition(action):
-    was_transition_succefull = True
     running_containers = get_current_replica_count(service_prefix=service_name)
     current_cpu_shares = get_current_cpu_shares(service_name)
     print(f"Log: Current CPU shares from transition: {current_cpu_shares}")
 
-    if action == -1 and running_containers > 1:  # Scale in (decrease containers)
+    if action == -1:  # Scale in (decrease containers)
         print("Log: Decrease Container by 1")
-        scale_in(service_name=service_name, scale_out_factor=1)
-    else:
-        print("Log: Decreasing container is not possible, because lowest point has been reached")
-        was_transition_succefull = False
-        
-    if action == 1 and running_containers < max_replicas:  # Scale out (increase containers)
+        was_transition_succefull = scale_in(service_name=service_name, scale_out_factor=1) 
+    elif action == 1:  # Scale out (increase containers)
         print("Log: Increase Container by 1")
         desired_replicas = running_containers + 1
-        scale_out(service_name=service_name, desired_replicas=desired_replicas)
-    else:
-        print("Log: Increasing container is not possible, because highest point has been reached")
-        was_transition_succefull = False
-    
-    if action == -512:  # Decrease CPU shares
+        was_transition_succefull = scale_out(service_name=service_name, desired_replicas=desired_replicas)
+    elif action == -512:  # Decrease CPU shares
         print("Log: Decrease CPU shares")
         was_transition_succefull = decrease_cpu_share_step(current_cpu_share = current_cpu_shares)
-    elif action == 512:  # Increase CPU shares       
+    elif action == 512:  # Increase CPU shares
         print("Log: Increase CPU shares")
         was_transition_succefull = increase_cpu_share_step(current_cpu_share = current_cpu_shares)
     elif action == 0:
@@ -229,19 +220,29 @@ def get_current_replica_count(service_prefix):
 
 def scale_out(service_name, desired_replicas):
     client = docker.from_env()
-    service = client.services.get(service_name)
-    service.scale(desired_replicas)
-    print(f"Log: Service '{service_name}' scaled to {desired_replicas} replicas.")
-    time.sleep(15)
+    if desired_replicas <= max_replicas:
+        service = client.services.get(service_name)
+        service.scale(desired_replicas)
+        print(f"Log: Service '{service_name}' scaled to {desired_replicas} replicas.")
+        time.sleep(15)
+        return True
+    else:
+        print("Log: Maximum containers reached, transition not possible.")
+        return False
 
 def scale_in(service_name, scale_out_factor):
     client = docker.from_env()
     service = client.services.get(service_name)
     current_replicas = get_current_replica_count(service_name)
-    desired_replicas = current_replicas - scale_out_factor
-    service.scale(desired_replicas)
-    print(f"Log: Service '{service_name}' scaled to {desired_replicas} replicas.")
-    time.sleep(15)
+    if current_replicas != 1:
+        desired_replicas = current_replicas - scale_out_factor
+        service.scale(desired_replicas)
+        print(f"Log: Service '{service_name}' scaled to {desired_replicas} replicas.")
+        time.sleep(15)
+        return True
+    else:
+        print(f'Log: Minimum containers reached, transtion is not possible.')
+        return False
 
 def state():
     docker_client = DockerAPI(service_name)
