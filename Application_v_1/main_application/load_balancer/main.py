@@ -307,6 +307,8 @@ def run_q_learning(num_episodes):
             a1 = 1 if action in [1, -1] else 0
             a2 = 1 if action in [-512, 512] else 0
             
+            if was_transition_succefull == False:
+                performance_penalty = 100
             total_cost += Costs.overall_cost_function(wadp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)
             
             print(f'Log: Total Cost: {total_cost}, action: {action}')
@@ -314,10 +316,7 @@ def run_q_learning(num_episodes):
             elapsed_time = (datetime.now() - start_time).total_seconds()
             total_time += elapsed_time  # Update total time
             
-            if was_transition_succefull == True:
-                total_reward += total_cost
-            else:
-                total_reward += 100 
+            total_reward += total_cost
             total_cpu_utilization += current_state[1]
             total_cpu_shares += current_state[0]
             total_containers += current_state[2]
