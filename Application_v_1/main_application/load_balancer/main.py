@@ -473,7 +473,9 @@ def save_final_statistics(statistics, filename):
 
 if __name__ == '__main__':
     
-    num_episodes = 3
+    reset_environment_to_initial_state()
+    
+    num_episodes = 40 
 
     baseline = False
     
