@@ -270,12 +270,12 @@ def run_q_learning(num_episodes):
     adaptation_counts = []
     
     print("Log: Training Starting ...")
+    training_start_time = datetime.now()  # Start time of the entire training
 
     while episode <= num_episodes:
-        print(f'\n Log: Epidose: {episode}')
+        print(f'\nLog: Episode: {episode}')
         app_state = state()
         total_cost = 0
-        total_time = 0
         total_reward = 0
         total_cpu_utilization = 0
         total_cpu_shares = 0
@@ -285,10 +285,9 @@ def run_q_learning(num_episodes):
         adaptation_count = 0
         Rmax_violation_count = 0
         next_state = app_state
-        start_time = datetime.now()
+        episode_start_time = datetime.now()  # Start time of the current episode
 
         while True:
-            elapsed_time = (datetime.now() - start_time).total_seconds()
             print("\n")
             current_state = next_state
             nearest_state = find_nearest_state(current_state, state_space)
@@ -315,7 +314,7 @@ def run_q_learning(num_episodes):
             total_cost += cost
             print(f'Log: Cost: {cost}, action: {action}')
             print(f'Total Cost: {total_cost}')
-            total_reward += total_cost
+            total_reward += cost
             total_cpu_utilization += current_state[1]
             total_cpu_shares += current_state[0]
             total_containers += current_state[2]
@@ -337,23 +336,32 @@ def run_q_learning(num_episodes):
                 alpha * (cost + gamma * min(Q[next_state_idx, :]))
             )
             
-            total_time += elapsed_time
-            # Calculate ETA
+            # Calculate ETA for the episode
+            elapsed_time_episode = (datetime.now() - episode_start_time).total_seconds()
+            average_time_per_step = elapsed_time_episode / steps if steps > 0 else 0
+            remaining_steps = max(0, steps - 1)  # Assuming steps is an integer
+            remaining_time_for_episode = remaining_steps * average_time_per_step
+            eta_for_episode = datetime.now() + timedelta(seconds=remaining_time_for_episode)
+
+            # Calculate ETA for all episodes
+            elapsed_time_total = (datetime.now() - training_start_time).total_seconds()
+            average_time_per_episode = elapsed_time_total / episode if episode > 0 else 0
             remaining_episodes = num_episodes - episode
-            average_time_per_episode = total_time / episode if episode > 0 else 0
-            remaining_time = remaining_episodes * average_time_per_episode
-            eta = datetime.now() + timedelta(seconds=remaining_time)
+            remaining_time_for_all_episodes = remaining_episodes * average_time_per_episode
+            eta_for_all_episodes = datetime.now() + timedelta(seconds=remaining_time_for_all_episodes)
+
             athens_tz = pytz.timezone('Europe/Athens')
-            eta_athens = eta.astimezone(athens_tz)
+            eta_episode_athens = eta_for_episode.astimezone(athens_tz)
+            eta_all_episodes_athens = eta_for_all_episodes.astimezone(athens_tz)
 
-            print(f"Log: Episode: {episode}, ETA: {eta_athens}")
+            print(f"Log: Episode: {episode}, ETA for current episode: {eta_episode_athens}, ETA for all episodes: {eta_all_episodes_athens}")
 
-            if elapsed_time > 60:
+            if elapsed_time_episode > 60:
                 break  # Breaking if elapsed time is more than 1 minute
 
         episode += 1
         costs_per_episode.append(total_cost / steps)
-        total_time_per_episode.append(total_time / steps)
+        total_time_per_episode.append(elapsed_time_episode / steps)
         average_cost_per_episode.append(total_reward / steps)
         Rmax_violations.append(Rmax_violation_count)
         average_cpu_utilization.append(total_cpu_utilization / steps)
