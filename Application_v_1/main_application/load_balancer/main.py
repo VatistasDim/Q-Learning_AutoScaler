@@ -272,7 +272,7 @@ def run_q_learning(num_episodes):
     average_response_time = []
     adaptation_counts = []
     
-    print("Log: Training Starting ... \n")
+    print("Log: Training Starting ...")
 
     while episode <= num_episodes:
         print(f'\n Log: Epidose: {episode}')
@@ -296,9 +296,14 @@ def run_q_learning(num_episodes):
             current_state = next_state
             nearest_state = find_nearest_state(current_state, state_space)
             action = select_action(Q, nearest_state, epsilon)
+            
+            if not was_transition_succefull:
+                print('Info: No action because no transition was made.')
+                action = 0
             next_state = transition(action)
             
             fetched_data = fetch_data()  # Fetch data once per iteration
+            
             if fetched_data[3] is None:
                 print("Error: Performance penalty is None. Skipping calculation.")
                 performance_penalty = 0
@@ -310,9 +315,6 @@ def run_q_learning(num_episodes):
             a1 = 1 if action in [1, -1] else 0
             a2 = 1 if action in [-512, 512] else 0
             cost = Costs.overall_cost_function(wadp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)
-            if was_transition_succefull:
-                print('Info: Cost will be affected by 10 because no transition was made.')
-                cost = 100
             total_cost += cost
             print(f'Log: Cost: {cost}, action: {action}')
             print(f'Total Cost: {total_cost}')
