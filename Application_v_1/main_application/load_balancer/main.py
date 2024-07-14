@@ -1,16 +1,14 @@
 import numpy as np
-import random, logging, time
+import time
 import prometheus_metrics
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
-from autoscaler_env import AutoscaleEnv
 from docker_api import DockerAPI
 from costs import Costs
 import docker
 import pytz, os
 import itertools
 
-# Ensure the directory exists
 if not os.path.exists('/app/plots'):
     os.makedirs('/app/plots')
 
@@ -18,12 +16,11 @@ log_dir = '/app/logs'
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)   
 
-# Constants
 timezone = pytz.timezone('Europe/Athens')
 wperf = 0.09
 wres = 0.90
 wadp = 0.01
-Rmax = 0.5 #This is in ms
+Rmax = 0.5
 alpha = 0.5
 gamma = 0.5
 epsilon = 0.4
@@ -34,8 +31,8 @@ service_name = 'mystack_application'
 application_url = 'http://application:8501/train'
 max_replicas = 10
 min_replicas = 1
-w_perf = 0.5  # Weight assigned to the performance penalty term in the cost function
-w_res = 0.4  # Determines the importance of the resource cost in the overall cost calculation
+w_perf = 0.5 
+w_res = 0.4
 max_containers = 11
 
 # Define the ranges for CPU utilization, number of running containers, and CPU shares
@@ -296,11 +293,11 @@ def run_q_learning(num_episodes):
             current_state = next_state
             nearest_state = find_nearest_state(current_state, state_space)
             action = select_action(Q, nearest_state, epsilon)
+            next_state = transition(action)
             
             if not was_transition_succefull:
                 print('Info: No action because no transition was made.')
                 action = 0
-            next_state = transition(action)
             
             fetched_data = fetch_data()  # Fetch data once per iteration
             
