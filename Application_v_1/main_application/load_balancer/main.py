@@ -363,7 +363,7 @@ def run_q_learning(num_episodes):
         costs_per_episode.append(total_cost / steps)
         total_time_per_episode.append(elapsed_time_episode / steps)
         average_cost_per_episode.append(total_reward / steps)
-        Rmax_violations.append(Rmax_violation_count)
+        Rmax_violations.append(Rmax_violation_count / steps)
         average_cpu_utilization.append(total_cpu_utilization / steps)
         average_cpu_shares.append(total_cpu_shares / steps)
         average_num_containers.append(total_containers / steps)
