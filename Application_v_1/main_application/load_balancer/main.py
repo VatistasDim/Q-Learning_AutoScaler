@@ -17,13 +17,10 @@ if not os.path.exists(log_dir):
     os.makedirs(log_dir)   
 
 timezone = pytz.timezone('Europe/Athens')
-wperf = 0.09
-wres = 0.90
-wadp = 0.01
 Rmax = 0.5
-alpha = 0.5
-gamma = 0.5
-epsilon = 0.4
+alpha = 0.1
+gamma = 0.99
+epsilon = 1/40
 cres = 0.01
 wait_time = 15
 url = 'http://prometheus:9090/api/v1/query'
@@ -257,7 +254,7 @@ def find_nearest_state(state, state_space):
     nearest_index = np.argmin(distances)
     return state_space[nearest_index]
 
-def run_q_learning(num_episodes):
+def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     episode = 1
     costs_per_episode = []
     total_time_per_episode = []
@@ -479,45 +476,138 @@ if __name__ == '__main__':
 
     baseline = False
     
+    run_first = True
+    
+    run_second = True
+    
+    run_third = True
+    
+    if run_first:
     # Run Q-learning and gather metrics
-    q_learning_metrics = run_q_learning(num_episodes)
-    
-    # Extract metrics
-    (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
-    average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts) = q_learning_metrics
-    
-    # Plot and save Q-learning results
-    num_iterations = len(costs_per_episode)
-    iterations = range(1, num_iterations + 1)
-    
-    plot_metric(iterations, costs_per_episode, 'Total Cost', 'Total Cost per Episode', '/app/plots/total_cost_per_episode.png')
-    plot_metric(iterations, total_time_per_episode, 'Total Time', 'Total Time per Episode', '/app/plots/total_time_per_episode.png')
-    plot_metric(iterations, average_cost_per_episode, 'Average Cost', 'Average Cost per Episode', '/app/plots/average_cost_per_episode.png')
-    plot_metric(iterations, Rmax_violations, 'Rmax Violations (%)', 'Rmax Violations per Episode', '/app/plots/rmax_violations_per_episode.png')
-    plot_metric(iterations, average_cpu_utilization, 'Average CPU Utilization (%)', 'Average CPU Utilization per Episode', '/app/plots/average_cpu_utilization_per_episode.png')
-    plot_metric(iterations, average_cpu_shares, 'Average CPU Shares (%)', 'Average CPU Shares per Episode', '/app/plots/average_cpu_shares_per_episode.png')
-    plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode', '/app/plots/average_num_containers_per_episode.png')
-    plot_metric(iterations, average_response_time, 'Average Response Time (ms)', 'Average Response Time per Episode', '/app/plots/average_response_time_per_episode.png')
-    plot_metric(iterations, adaptation_counts, 'Adaptations (%)', 'Adaptations per Episode', '/app/plots/adaptations_per_episode.png')
+        q_learning_metrics = run_q_learning(num_episodes, w_adp=0.01, w_perf=0.90, w_res=0.09)
+        
+        # Extract metrics
+        (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
+        average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts, wperf, wadp, wres) = q_learning_metrics
+        
+        # Plot and save Q-learning results
+        num_iterations = len(costs_per_episode)
+        iterations = range(1, num_iterations + 1)
+        
+        plot_metric(iterations, costs_per_episode, 'Total Cost', 'Total Cost per Episode', '/app/plots/total_cost_per_episode_first.png')
+        plot_metric(iterations, total_time_per_episode, 'Total Time', 'Total Time per Episode', '/app/plots/total_time_per_episode_first.png')
+        plot_metric(iterations, average_cost_per_episode, 'Average Cost', 'Average Cost per Episode', '/app/plots/average_cost_per_episode_first.png')
+        plot_metric(iterations, Rmax_violations, 'Rmax Violations (%)', 'Rmax Violations per Episode', '/app/plots/rmax_violations_per_episode_first.png')
+        plot_metric(iterations, average_cpu_utilization, 'Average CPU Utilization (%)', 'Average CPU Utilization per Episode', '/app/plots/average_cpu_utilization_per_episode_first.png')
+        plot_metric(iterations, average_cpu_shares, 'Average CPU Shares (%)', 'Average CPU Shares per Episode', '/app/plots/average_cpu_shares_per_episode_first.png')
+        plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode', '/app/plots/average_num_containers_per_episode_first.png')
+        plot_metric(iterations, average_response_time, 'Average Response Time (ms)', 'Average Response Time per Episode', '/app/plots/average_response_time_per_episode_first.png')
+        plot_metric(iterations, adaptation_counts, 'Adaptations (%)', 'Adaptations per Episode', '/app/plots/adaptations_per_episode_first.png')
 
-    # Prepare final episode statistics
-    q_learning_statistics = (
-        f"Q-learning Final Episode Statistics:\n"
-        f"Estimated Running Time: {num_episodes} in minutes\n"
-        f"Wperf = {wperf}, Wres = {wres}, Wadp = {wadp}, Rmax = {Rmax}\n"
-        f"Rmax Violations: {Rmax_violations[-1] * 100 / num_episodes:.2f}%\n"
-        f"Average CPU Utilization: {average_cpu_utilization[-1]:.2f}%\n"
-        f"Average CPU Shares: {average_cpu_shares[-1]:.2f}%\n"
-        f"Average Number of Containers: {average_num_containers[-1]:.2f}\n"
-        f"Average Response Time: {average_response_time[-1]:.2f} ms\n"
-        f"Adaptations: {adaptation_counts[-1] * 100 / num_episodes:.2f}%\n"
-    )
+        # Prepare final episode statistics
+        q_learning_statistics = (
+            f"Q-learning Final Episode Statistics:\n"
+            f"Estimated Running Time: {num_episodes} in minutes\n"
+            f"Wperf = {wperf}, Wres = {wres}, Wadp = {wadp}, Rmax = {Rmax}\n"
+            f"Rmax Violations: {Rmax_violations[-1] * 100 / num_episodes:.2f}%\n"
+            f"Average CPU Utilization: {average_cpu_utilization[-1]:.2f}%\n"
+            f"Average CPU Shares: {average_cpu_shares[-1]:.2f}%\n"
+            f"Average Number of Containers: {average_num_containers[-1]:.2f}\n"
+            f"Average Response Time: {average_response_time[-1]:.2f} ms\n"
+            f"Adaptations: {adaptation_counts[-1] * 100 / num_episodes:.2f}%\n"
+        )
 
-    # Save Q-learning final episode statistics to a log file
-    q_learning_log_path = '/logs/q-learning-final-log.txt'
-    save_final_statistics(q_learning_statistics, q_learning_log_path)
-    # Print and save final episode statistics
-    print(q_learning_statistics)
+        # Save Q-learning final episode statistics to a log file
+        q_learning_log_path = '/logs/q-learning-final-log_first.txt'
+        save_final_statistics(q_learning_statistics, q_learning_log_path)
+        # Print and save final episode statistics
+        print(q_learning_statistics)
+
+    reset_environment_to_initial_state()
+    
+    if run_second:
+        print("Log: Start running with different weights")
+        q_learning_metrics = run_q_learning(num_episodes, w_perf=0.09, w_adp=0.01, w_res=0.90)
+        
+        # Extract metrics
+        (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
+        average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts, wperf, wadp, wres) = q_learning_metrics
+        
+        # Plot and save Q-learning results
+        num_iterations = len(costs_per_episode)
+        iterations = range(1, num_iterations + 1)
+        
+        plot_metric(iterations, costs_per_episode, 'Total Cost', 'Total Cost per Episode', '/app/plots/total_cost_per_episode_second.png')
+        plot_metric(iterations, total_time_per_episode, 'Total Time', 'Total Time per Episode', '/app/plots/total_time_per_episode_second.png')
+        plot_metric(iterations, average_cost_per_episode, 'Average Cost', 'Average Cost per Episode', '/app/plots/average_cost_per_episode_second.png')
+        plot_metric(iterations, Rmax_violations, 'Rmax Violations (%)', 'Rmax Violations per Episode', '/app/plots/rmax_violations_per_episode_second.png')
+        plot_metric(iterations, average_cpu_utilization, 'Average CPU Utilization (%)', 'Average CPU Utilization per Episode', '/app/plots/average_cpu_utilization_per_episode_second.png')
+        plot_metric(iterations, average_cpu_shares, 'Average CPU Shares (%)', 'Average CPU Shares per Episode', '/app/plots/average_cpu_shares_per_episode_second.png')
+        plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode', '/app/plots/average_num_containers_per_episode_second.png')
+        plot_metric(iterations, average_response_time, 'Average Response Time (ms)', 'Average Response Time per Episode', '/app/plots/average_response_time_per_episode_second.png')
+        plot_metric(iterations, adaptation_counts, 'Adaptations (%)', 'Adaptations per Episode', '/app/plots/adaptations_per_episode_second.png')
+
+        # Prepare final episode statistics
+        q_learning_statistics = (
+            f"Q-learning Final Episode Statistics:\n"
+            f"Estimated Running Time: {num_episodes} in minutes\n"
+            f"Wperf = {wperf}, Wres = {wres}, Wadp = {wadp}, Rmax = {Rmax}\n"
+            f"Rmax Violations: {Rmax_violations[-1] * 100 / num_episodes:.2f}%\n"
+            f"Average CPU Utilization: {average_cpu_utilization[-1]:.2f}%\n"
+            f"Average CPU Shares: {average_cpu_shares[-1]:.2f}%\n"
+            f"Average Number of Containers: {average_num_containers[-1]:.2f}\n"
+            f"Average Response Time: {average_response_time[-1]:.2f} ms\n"
+            f"Adaptations: {adaptation_counts[-1] * 100 / num_episodes:.2f}%\n"
+        )
+
+        # Save Q-learning final episode statistics to a log file
+        q_learning_log_path = '/logs/q-learning-final-log_second.txt'
+        save_final_statistics(q_learning_statistics, q_learning_log_path)
+        # Print and save final episode statistics
+        print(q_learning_statistics)
+
+    reset_environment_to_initial_state()
+
+    if run_third:
+        print("Log: Start running with different weights")
+        q_learning_metrics = run_q_learning(num_episodes, w_adp=0.33, w_perf=0.33, w_res=0.33)
+        
+        # Extract metrics
+        (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
+        average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts, wperf, wadp, wres) = q_learning_metrics
+        
+        # Plot and save Q-learning results
+        num_iterations = len(costs_per_episode)
+        iterations = range(1, num_iterations + 1)
+        
+        plot_metric(iterations, costs_per_episode, 'Total Cost', 'Total Cost per Episode', '/app/plots/total_cost_per_episode_third.png')
+        plot_metric(iterations, total_time_per_episode, 'Total Time', 'Total Time per Episode', '/app/plots/total_time_per_episode_third.png')
+        plot_metric(iterations, average_cost_per_episode, 'Average Cost', 'Average Cost per Episode', '/app/plots/average_cost_per_episode_third.png')
+        plot_metric(iterations, Rmax_violations, 'Rmax Violations (%)', 'Rmax Violations per Episode', '/app/plots/rmax_violations_per_episode_third.png')
+        plot_metric(iterations, average_cpu_utilization, 'Average CPU Utilization (%)', 'Average CPU Utilization per Episode', '/app/plots/average_cpu_utilization_per_episode_third.png')
+        plot_metric(iterations, average_cpu_shares, 'Average CPU Shares (%)', 'Average CPU Shares per Episode', '/app/plots/average_cpu_shares_per_episode_third.png')
+        plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode', '/app/plots/average_num_containers_per_episode_third.png')
+        plot_metric(iterations, average_response_time, 'Average Response Time (ms)', 'Average Response Time per Episode', '/app/plots/average_response_time_per_episode_third.png')
+        plot_metric(iterations, adaptation_counts, 'Adaptations (%)', 'Adaptations per Episode', '/app/plots/adaptations_per_episode_third.png')
+
+        # Prepare final episode statistics
+        q_learning_statistics = (
+            f"Q-learning Final Episode Statistics:\n"
+            f"Estimated Running Time: {num_episodes} in minutes\n"
+            f"Wperf = {wperf}, Wres = {wres}, Wadp = {wadp}, Rmax = {Rmax}\n"
+            f"Rmax Violations: {Rmax_violations[-1] * 100 / num_episodes:.2f}%\n"
+            f"Average CPU Utilization: {average_cpu_utilization[-1]:.2f}%\n"
+            f"Average CPU Shares: {average_cpu_shares[-1]:.2f}%\n"
+            f"Average Number of Containers: {average_num_containers[-1]:.2f}\n"
+            f"Average Response Time: {average_response_time[-1]:.2f} ms\n"
+            f"Adaptations: {adaptation_counts[-1] * 100 / num_episodes:.2f}%\n"
+        )
+
+        # Save Q-learning final episode statistics to a log file
+        q_learning_log_path = '/logs/q-learning-final-log_third.txt'
+        save_final_statistics(q_learning_statistics, q_learning_log_path)
+        # Print and save final episode statistics
+        print(q_learning_statistics)
 
     # Reset the environment to its initial state
     reset_environment_to_initial_state()
