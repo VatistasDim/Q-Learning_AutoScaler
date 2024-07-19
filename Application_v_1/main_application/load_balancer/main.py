@@ -307,7 +307,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             resource_cost = cres * float(next_state[2])
             a1 = 1 if action in [1, -1] else 0
             a2 = 1 if action in [-512, 512] else 0
-            cost = Costs.overall_cost_function(wadp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)
+            cost = Costs.overall_cost_function(w_adp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)
             total_cost += cost
             print(f'Log: Cost: {cost}, action: {action}')
             print(f'Total Cost: {total_cost}')
