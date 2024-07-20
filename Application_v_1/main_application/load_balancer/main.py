@@ -42,7 +42,7 @@ state_space = list(itertools.product(cpu_shares_values, cpu_utilization_values, 
 action_space = [-1, 0, 1, -512, 512]  # Actions: -1 (scale in), 0 (do nothing), 1 (scale out), -512 (decrease CPU shares), 512 (increase CPU shares)
 
 # Initialize Q-table
-Q = np.zeros((len(state_space), len(action_space)))
+# Q = np.zeros((len(state_space), len(action_space)))
 
 iteration = 1
 
@@ -483,7 +483,10 @@ if __name__ == '__main__':
     run_third = True
     
     if run_first:
-    # Run Q-learning and gather metrics
+        
+        # Initialize Q-table
+        Q = np.zeros((len(state_space), len(action_space)))
+        # Run Q-learning and gather metrics
         q_learning_metrics = run_q_learning(num_episodes, w_adp=0.01, w_perf=0.90, w_res=0.09)
         
         # Extract metrics
@@ -526,6 +529,8 @@ if __name__ == '__main__':
     reset_environment_to_initial_state()
     
     if run_second:
+        # Initialize Q-table
+        Q = np.zeros((len(state_space), len(action_space)))
         print("Log: Start running with different weights")
         q_learning_metrics = run_q_learning(num_episodes, w_perf=0.09, w_adp=0.01, w_res=0.90)
         
@@ -569,6 +574,8 @@ if __name__ == '__main__':
     reset_environment_to_initial_state()
 
     if run_third:
+        # Initialize Q-table
+        Q = np.zeros((len(state_space), len(action_space)))
         print("Log: Start running with different weights")
         q_learning_metrics = run_q_learning(num_episodes, w_adp=0.33, w_perf=0.33, w_res=0.33)
         
