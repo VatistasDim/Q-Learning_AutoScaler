@@ -368,7 +368,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         adaptation_counts.append(adaptation_count / steps)
 
     return (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
-            average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts)
+            average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts, w_adp, w_perf, w_res)
 
 def run_baseline(num_episodes):
     episode = 1
@@ -488,7 +488,7 @@ if __name__ == '__main__':
         
         # Extract metrics
         (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
-        average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts, wperf, wadp, wres) = q_learning_metrics
+        average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts, wadp, wperf, wres) = q_learning_metrics
         
         # Plot and save Q-learning results
         num_iterations = len(costs_per_episode)
@@ -531,7 +531,7 @@ if __name__ == '__main__':
         
         # Extract metrics
         (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
-        average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts, wperf, wadp, wres) = q_learning_metrics
+        average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts, wadp, wperf, wres) = q_learning_metrics
         
         # Plot and save Q-learning results
         num_iterations = len(costs_per_episode)
@@ -574,7 +574,7 @@ if __name__ == '__main__':
         
         # Extract metrics
         (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
-        average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts, wperf, wadp, wres) = q_learning_metrics
+        average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts, wadp, wperf, wres) = q_learning_metrics
         
         # Plot and save Q-learning results
         num_iterations = len(costs_per_episode)
