@@ -625,7 +625,10 @@ if __name__ == '__main__':
         
         # Extract metrics
         costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations, average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts = baseline_metrics
-
+        
+        num_iterations = len(costs_per_episode)
+        iterations = range(1, num_iterations + 1)
+        
         # Plot and save baseline results
         plot_metric(iterations, costs_per_episode, 'Total Cost', 'Total Cost per Episode (Baseline)', '/app/plots/total_cost_per_episode_baseline.png')
         plot_metric(iterations, total_time_per_episode, 'Total Time', 'Total Time per Episode (Baseline)', '/app/plots/total_time_per_episode_baseline.png')
