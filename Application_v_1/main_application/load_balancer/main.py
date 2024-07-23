@@ -52,7 +52,7 @@ def reset_environment_to_initial_state():
     set_cpu_shares(service_name, 2.0)
 
 def transition(action):
-    global was_transition_succefull  # Declare the global variable
+    global was_transition_succefull
     running_containers = get_current_replica_count(service_prefix=service_name)
     current_cpu_shares = get_current_cpu_shares(service_name)
     print(f"Log: Current CPU shares from transition: {current_cpu_shares}")
@@ -353,19 +353,31 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
 
             print(f"Log: Episode: {episode}, ETA for current episode: {eta_episode_athens}, ETA for all episodes: {eta_all_episodes_athens}")
 
-            if elapsed_time_episode > 60:
-                break  # Breaking if elapsed time is more than 1 minute
+            if elapsed_time_episode > 60 or steps >= 1000:  # Ensure sufficient steps per episode
+                break
+
+        if steps > 0:
+            costs_per_episode.append(total_cost / steps)
+            total_time_per_episode.append(elapsed_time_episode / steps)
+            average_cost_per_episode.append(total_reward / steps)
+            Rmax_violations.append(Rmax_violation_count / steps)
+            average_cpu_utilization.append(total_cpu_utilization / steps)
+            average_cpu_shares.append(total_cpu_shares / steps)
+            average_num_containers.append(total_containers / steps)
+            average_response_time.append(total_response_time / steps)
+            adaptation_counts.append(adaptation_count / steps)
+        else:
+            costs_per_episode.append(0)
+            total_time_per_episode.append(0)
+            average_cost_per_episode.append(0)
+            Rmax_violations.append(0)
+            average_cpu_utilization.append(0)
+            average_cpu_shares.append(0)
+            average_num_containers.append(0)
+            average_response_time.append(0)
+            adaptation_counts.append(0)
 
         episode += 1
-        costs_per_episode.append(total_cost / steps)
-        total_time_per_episode.append(elapsed_time_episode / steps)
-        average_cost_per_episode.append(total_reward / steps)
-        Rmax_violations.append(Rmax_violation_count / steps)
-        average_cpu_utilization.append(total_cpu_utilization / steps)
-        average_cpu_shares.append(total_cpu_shares / steps)
-        average_num_containers.append(total_containers / steps)
-        average_response_time.append(total_response_time / steps)
-        adaptation_counts.append(adaptation_count / steps)
 
     return (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
             average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts, w_adp, w_perf, w_res)
@@ -381,7 +393,7 @@ def run_baseline(num_episodes):
     average_num_containers = []
     average_response_time = []
     adaptation_counts = []
-
+ 
     while episode <= num_episodes:
         app_state = state()
         total_cost = 0
