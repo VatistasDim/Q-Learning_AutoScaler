@@ -297,12 +297,12 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             fetched_data = fetch_data()  # Fetch data once per iteration
             
-            if fetched_data[3] is None:
-                print("Error: Performance penalty is None. Skipping calculation.")
-                performance_penalty = 0
-                break
-            else:
-                _, _, _, performance_penalty, _ = fetched_data
+            while fetched_data[3] is None:
+                print("Error: Performance penalty is None. Retring every 2 seconds ...")
+                time.sleep(2)
+                fetched_data = fetch_data()
+            
+            _, _, _, performance_penalty, _ = fetched_data
 
             resource_cost = cres * float(next_state[2])
             a1 = 1 if action in [1, -1] else 0
@@ -315,7 +315,6 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             total_cpu_utilization += current_state[1]
             total_cpu_shares += current_state[0]
             total_containers += current_state[2]
-            total_response_time += fetched_data[3]
             
             steps += 1
             
@@ -351,9 +350,9 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             eta_episode_athens = eta_for_episode.astimezone(athens_tz)
             eta_all_episodes_athens = eta_for_all_episodes.astimezone(athens_tz)
 
-            print(f"Log: Episode: {episode}, ETA for current episode: {eta_episode_athens}, ETA for all episodes: {eta_all_episodes_athens}")
+            print(f"\nLog: Episode: {episode}, ETA for current episode: {eta_episode_athens}, ETA for all episodes: {eta_all_episodes_athens}")
 
-            if elapsed_time_episode > 60 or steps >= 1000:  # Ensure sufficient steps per episode
+            if elapsed_time_episode > 60 or steps >= 1000:
                 break
 
         if steps > 0:
