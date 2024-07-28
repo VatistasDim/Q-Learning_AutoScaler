@@ -20,7 +20,7 @@ timezone = pytz.timezone('Europe/Athens')
 Rmax = 0.5
 alpha = 0.1
 gamma = 0.99
-epsilon = 1/40
+epsilon = 1/5
 cres = 0.01
 wait_time = 15
 url = 'http://prometheus:9090/api/v1/query'
@@ -254,6 +254,20 @@ def find_nearest_state(state, state_space):
     nearest_index = np.argmin(distances)
     return state_space[nearest_index]
 
+def ensure_perfomance_penalty_has_data(fetched_data):
+    
+    while fetched_data[3] is None:
+                
+        print("Error: Performance penalty is None. Retring every 2 seconds ...")
+                
+        time.sleep(2)
+                
+        fetched_data = fetch_data()
+        
+    _, _, _, performance_penalty, _ = fetched_data
+    
+    return performance_penalty
+
 def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     episode = 1
     costs_per_episode = []
@@ -295,25 +309,31 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
                 print('Info: No action because no transition was made.')
                 action = 0
             
-            fetched_data = fetch_data()  # Fetch data once per iteration
-            
-            while fetched_data[3] is None:
-                print("Error: Performance penalty is None. Retring every 2 seconds ...")
-                time.sleep(2)
-                fetched_data = fetch_data()
-            
-            _, _, _, performance_penalty, _ = fetched_data
+            #fetched_data = fetch_data()  # Fetch data once per iteration
+            performance_penalty = ensure_perfomance_penalty_has_data(fetched_data=fetch_data)
 
-            resource_cost = cres * float(next_state[2])
+            total_response_time += performance_penalty
+            
+            #resource_cost = cres * float(next_state[2])
+            
             a1 = 1 if action in [1, -1] else 0
+            
             a2 = 1 if action in [-512, 512] else 0
+            
             cost = Costs.overall_cost_function(w_adp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)
+            
             total_cost += cost
+            
             print(f'Log: Cost: {cost}, action: {action}')
+            
             print(f'Total Cost: {total_cost}')
+            
             total_reward += cost
+            
             total_cpu_utilization += current_state[1]
+            
             total_cpu_shares += current_state[0]
+            
             total_containers += current_state[2]
             
             steps += 1
@@ -414,18 +434,11 @@ def run_baseline(num_episodes):
             
             next_state = transition(None)  # No Q-learning action selection
             
-            _, _, _, performance_penalty, _ = fetch_data()
+            performance_penalty = ensure_perfomance_penalty_has_data(fetched_data=fetch_data)
             
-            if performance_penalty is not None:
-                performance_penalty = performance_penalty - 0.50
-            else:
-                print("Error: Performance penalty is None. Skipping calculation.")
-                performance_penalty = 0
-
+            total_response_time += performance_penalty
+            
             resource_cost = cres * float(next_state[2])
-            
-            if performance_penalty < 0:
-                performance_penalty = 0
             
             total_cost += w_perf * performance_penalty + w_res * resource_cost
             
@@ -438,8 +451,6 @@ def run_baseline(num_episodes):
             total_cpu_shares += current_state[0]
             
             total_containers += current_state[2]
-            
-            _, _, _, total_response_time, _ = fetch_data()
             
             steps += 1
             
@@ -485,7 +496,7 @@ if __name__ == '__main__':
     
     num_episodes = 40 
 
-    baseline = False
+    baseline = True
     
     run_first = True
     
