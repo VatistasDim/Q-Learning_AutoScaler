@@ -316,6 +316,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             performance_penalty = ensure_perfomance_penalty_has_data(performance_penalty)
             print(f'Log: Perfomance Time: {performance_penalty}')
             total_response_time += performance_penalty
+            print(f'Log: Total response time: {total_response_time}')
             
             #resource_cost = cres * float(next_state[2])
             
@@ -340,6 +341,8 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             total_containers += current_state[2]
             
             steps += 1
+            
+            print(f'Log: Avarage response time: {total_response_time / steps}')
             
             if action != 0:
                 adaptation_count += 1
@@ -398,6 +401,8 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             average_num_containers.append(0)
             average_response_time.append(0)
             adaptation_counts.append(0)
+            
+        print(f'Log: Avarage response time: {total_response_time / steps}')
 
         episode += 1
 
