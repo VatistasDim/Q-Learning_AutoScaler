@@ -262,11 +262,11 @@ def ensure_perfomance_penalty_has_data(perfomance_data):
                 
         time.sleep(2)
                 
-        perfomance_data = fetch_data()
+        fetched_data = fetch_data()
         
-    _, _, _, performance_penalty, _ = perfomance_data
+        _, _, _, perfomance_data, _ = fetched_data
     
-    return performance_penalty
+    return perfomance_data
 
 def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     episode = 1
