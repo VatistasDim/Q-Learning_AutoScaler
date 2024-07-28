@@ -309,8 +309,9 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
                 print('Info: No action because no transition was made.')
                 action = 0
             
-            #fetched_data = fetch_data()  # Fetch data once per iteration
-            performance_penalty = ensure_perfomance_penalty_has_data(fetched_data=fetch_data)
+            fetched_data = fetch_data()  # Fetch data once per iteration
+            
+            performance_penalty = ensure_perfomance_penalty_has_data(fetched_data)
 
             total_response_time += performance_penalty
             
@@ -434,7 +435,9 @@ def run_baseline(num_episodes):
             
             next_state = transition(None)  # No Q-learning action selection
             
-            performance_penalty = ensure_perfomance_penalty_has_data(fetched_data=fetch_data)
+            fetched_data = fetch_data()  # Fetch data once per iteration
+            
+            performance_penalty = ensure_perfomance_penalty_has_data(fetched_data)
             
             total_response_time += performance_penalty
             
