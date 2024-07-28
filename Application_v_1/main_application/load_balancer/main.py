@@ -254,17 +254,17 @@ def find_nearest_state(state, state_space):
     nearest_index = np.argmin(distances)
     return state_space[nearest_index]
 
-def ensure_perfomance_penalty_has_data(fetched_data):
+def ensure_perfomance_penalty_has_data(perfomance_data):
     
-    while fetched_data[3] is None:
+    while perfomance_data is None:
                 
         print("Error: Performance penalty is None. Retring every 2 seconds ...")
                 
         time.sleep(2)
                 
-        fetched_data = fetch_data()
+        perfomance_data = fetch_data()
         
-    _, _, _, performance_penalty, _ = fetched_data
+    _, _, _, performance_penalty, _ = perfomance_data
     
     return performance_penalty
 
@@ -308,10 +308,12 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             if not was_transition_succefull:
                 print('Info: No action because no transition was made.')
                 action = 0
-            
+                
             fetched_data = fetch_data()  # Fetch data once per iteration
             
-            performance_penalty = ensure_perfomance_penalty_has_data(fetched_data)
+            _, _, _, performance_penalty, _ = fetched_data
+            
+            performance_penalty = ensure_perfomance_penalty_has_data(performance_penalty)
 
             total_response_time += performance_penalty
             
@@ -437,7 +439,9 @@ def run_baseline(num_episodes):
             
             fetched_data = fetch_data()  # Fetch data once per iteration
             
-            performance_penalty = ensure_perfomance_penalty_has_data(fetched_data)
+            _, _, _, performance_penalty, _ = fetched_data
+            
+            performance_penalty = ensure_perfomance_penalty_has_data(performance_penalty)
             
             total_response_time += performance_penalty
             
