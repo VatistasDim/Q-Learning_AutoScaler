@@ -280,6 +280,9 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     average_response_time = []
     adaptation_counts = []
     
+    total_adaptations = 0
+    total_actions = 0
+    
     print("Log: Training Starting ...")
     training_start_time = datetime.now()  # Start time of the entire training
 
@@ -342,10 +345,13 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             steps += 1
             
-            print(f'Log: Avarage response time: {total_response_time / steps}')
+            print(f'Log: Avarage response time of current episode: {total_response_time / steps}')
             
             if action != 0:
                 adaptation_count += 1
+                total_adaptations += 1
+            
+            total_actions += 1
             
             if performance_penalty > Rmax:
                 Rmax_violation_count += 1
@@ -389,7 +395,6 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             average_cpu_utilization.append(total_cpu_utilization / steps)
             average_cpu_shares.append(total_cpu_shares / steps)
             average_num_containers.append(total_containers / steps)
-            average_response_time.append(total_response_time / steps)
             adaptation_counts.append(adaptation_count / steps)
         else:
             costs_per_episode.append(0)
@@ -405,10 +410,16 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         print(f'Log: Avarage response time: {total_response_time / steps}')
 
         episode += 1
+        
+        if episode == num_episodes:
+            average_response_time.append(total_response_time / num_episodes)
+
+    adaptation_percentage = (total_adaptations / total_actions) * 100 if total_actions > 0 else 0
 
     return (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
-            average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts, w_adp, w_perf, w_res)
-
+            average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts,
+            w_adp, w_perf, w_res, adaptation_percentage)
+    
 def run_baseline(num_episodes):
     episode = 1
     costs_per_episode = []
@@ -525,7 +536,7 @@ if __name__ == '__main__':
         
         # Extract metrics
         (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
-        average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts, wadp, wperf, wres) = q_learning_metrics
+        average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts, wadp, wperf, wres, adaptation_percentage) = q_learning_metrics
         
         # Plot and save Q-learning results
         num_iterations = len(costs_per_episode)
@@ -551,7 +562,7 @@ if __name__ == '__main__':
             f"Average CPU Shares: {average_cpu_shares[-1]:.2f}%\n"
             f"Average Number of Containers: {average_num_containers[-1]:.2f}\n"
             f"Average Response Time: {average_response_time[-1]:.2f} ms\n"
-            f"Adaptations: {adaptation_counts[-1] * 100 / num_episodes:.2f}%\n"
+            f"Adaptations: {adaptation_percentage:.2f}%\n"
         )
 
         # Save Q-learning final episode statistics to a log file
