@@ -314,7 +314,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             _, _, _, performance_penalty, _ = fetched_data
             
             performance_penalty = ensure_perfomance_penalty_has_data(performance_penalty)
-
+            print(f'Log: Perfomance Time: {performance_penalty}')
             total_response_time += performance_penalty
             
             #resource_cost = cres * float(next_state[2])
