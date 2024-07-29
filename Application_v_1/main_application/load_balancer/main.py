@@ -17,7 +17,7 @@ if not os.path.exists(log_dir):
     os.makedirs(log_dir)   
 
 timezone = pytz.timezone('Europe/Athens')
-Rmax = 0.5
+Rmax = 0.50
 alpha = 0.1
 gamma = 0.99
 epsilon = 1/5
@@ -345,8 +345,6 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             steps += 1
             
-            print(f'Log: Avarage response time of current episode: {total_response_time / steps}')
-            
             if action != 0:
                 adaptation_count += 1
                 total_adaptations += 1
@@ -382,8 +380,11 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             eta_episode_athens = eta_for_episode.astimezone(athens_tz)
             eta_all_episodes_athens = eta_for_all_episodes.astimezone(athens_tz)
 
-            print(f"\nLog: Episode: {episode}, ETA for current episode: {eta_episode_athens}, ETA for all episodes: {eta_all_episodes_athens}")
-
+            print(f"\nLog: Episode: {episode}, ETA for current episode: {eta_episode_athens}, \nLog: ETA for all episodes: {eta_all_episodes_athens}")
+            print(f'Log: Avarage response time of current episode: {total_response_time / steps}')
+            print(f'Log: Avarage response time for all episodes so far: {total_response_time / steps}')
+            print(f'Log: Avarage adaptions so far: {(total_adaptations / total_actions) * 100 if total_actions > 0 else 0}%')
+            
             if elapsed_time_episode > 60 or steps >= 1000:
                 break
 
@@ -406,8 +407,6 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             average_num_containers.append(0)
             average_response_time.append(0)
             adaptation_counts.append(0)
-            
-        print(f'Log: Avarage response time: {total_response_time / steps}')
 
         episode += 1
         
