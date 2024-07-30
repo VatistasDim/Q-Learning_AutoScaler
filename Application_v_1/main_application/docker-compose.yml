@@ -3,6 +3,9 @@ version: '3.9'
 networks:
   custom-overlay-network:
     driver: overlay
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
 
 services:
   application:
@@ -23,7 +26,8 @@ services:
         constraints:
           - node.role == worker
     networks:
-      - custom-overlay-network
+      custom-overlay-network:
+        ipv4_address: 172.18.0.6
 
   prometheus:
     image: prom/prometheus:v2.30.3
