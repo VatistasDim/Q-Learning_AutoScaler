@@ -254,19 +254,13 @@ def find_nearest_state(state, state_space):
     nearest_index = np.argmin(distances)
     return state_space[nearest_index]
 
-def ensure_perfomance_penalty_has_data(perfomance_data):
-    
-    while perfomance_data is None:
-                
-        print("Error: Performance penalty is None. Retring every 2 seconds ...")
-                
+def ensure_performance_penalty_has_data(performance_data):
+    while performance_data is None or np.isnan(performance_data):
+        print("Error: Performance penalty is None or NaN. Retrying every 2 seconds ...")
         time.sleep(2)
-                
         fetched_data = fetch_data()
-        
-        _, _, _, perfomance_data, _ = fetched_data
-    
-    return perfomance_data
+        _, _, _, performance_data, _ = fetched_data
+    return performance_data
 
 def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     episode = 1
@@ -316,7 +310,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             _, _, _, performance_penalty, _ = fetched_data
             
-            performance_penalty = ensure_perfomance_penalty_has_data(performance_penalty)
+            performance_penalty = ensure_performance_penalty_has_data(performance_penalty)
             print(f'Log: Perfomance Time: {performance_penalty}')
             total_response_time += performance_penalty
             print(f'Log: Total response time: {total_response_time}')
@@ -396,6 +390,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             average_cpu_utilization.append(total_cpu_utilization / steps)
             average_cpu_shares.append(total_cpu_shares / steps)
             average_num_containers.append(total_containers / steps)
+            average_response_time.append(total_response_time / steps)
             adaptation_counts.append(adaptation_count / steps)
         else:
             costs_per_episode.append(0)
@@ -409,15 +404,13 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             adaptation_counts.append(0)
 
         episode += 1
-        
-        if episode == num_episodes:
-            average_response_time.append(total_response_time / num_episodes)
 
     adaptation_percentage = (total_adaptations / total_actions) * 100 if total_actions > 0 else 0
 
     return (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
             average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts,
             w_adp, w_perf, w_res, adaptation_percentage)
+
     
 def run_baseline(num_episodes):
     episode = 1
@@ -456,7 +449,7 @@ def run_baseline(num_episodes):
             
             _, _, _, performance_penalty, _ = fetched_data
             
-            performance_penalty = ensure_perfomance_penalty_has_data(performance_penalty)
+            performance_penalty = ensure_performance_penalty_has_data(performance_penalty)
             
             total_response_time += performance_penalty
             
