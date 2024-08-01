@@ -397,10 +397,15 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         episode += 1
 
     adaptation_percentage = (total_adaptations / total_actions) * 100 if total_actions > 0 else 0
+    rmax_violations_percantage = (Rmax_violation_count / total_actions) * 100 if total_actions > 0 else 0
+    cpu_utilization_percentage = (total_cpu_utilization / total_actions) * 100 if total_actions > 0 else 0
+    containers_percentage = (total_containers / total_actions) * 100 if total_actions > 0 else 0
+    avarage_response_time = (total_response_time / total_actions)
+    average_cpu_shares_new = (total_cpu_shares / total_actions)
 
     return (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
             average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts,
-            w_adp, w_perf, w_res, adaptation_percentage)
+            w_adp, w_perf, w_res, adaptation_percentage, rmax_violations_percantage, cpu_utilization_percentage, containers_percentage, avarage_response_time, average_cpu_shares_new)
 
     
 def run_baseline(num_episodes):
@@ -519,7 +524,7 @@ if __name__ == '__main__':
 
         (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
         average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts,
-        w_adp, w_perf, w_res, adaptation_percentage) = q_learning_metrics
+        w_adp, w_perf, w_res, adaptation_percentage, rmax_violations_percantage, cpu_utilization_percentage, containers_percentage, avarage_response_time_new, average_cpu_shares_new) = q_learning_metrics
         # Plot and save Q-learning results
         num_iterations = len(costs_per_episode)
         iterations = range(1, num_iterations + 1)
@@ -539,11 +544,11 @@ if __name__ == '__main__':
             f"Q-learning Final Episode Statistics:\n"
             f"Estimated Running Time: {num_episodes} in minutes\n"
             f"Wperf = {w_perf}, Wres = {w_res}, Wadp = {w_adp}, Rmax = {Rmax}\n"
-            f"Rmax Violations: {Rmax_violations[-1] * 100 / num_episodes:.2f}%\n"
-            f"Average CPU Utilization: {average_cpu_utilization[-1]:.2f}%\n"
-            f"Average CPU Shares: {average_cpu_shares[-1]:.2f}%\n"
-            f"Average Number of Containers: {average_num_containers[-1]:.2f}\n"
-            f"Average Response Time: {average_response_time[-1]:.2f} ms\n"
+            f"Rmax Violations: {rmax_violations_percantage:.2f}%\n"
+            f"Average CPU Utilization: {cpu_utilization_percentage:.2f}%\n"
+            f"Average CPU Shares: {average_cpu_shares_new:.2f}%\n"
+            f"Average Number of Containers: {containers_percentage:.2f}\n"
+            f"Average Response Time: {avarage_response_time_new:.2f} ms\n"
             f"Adaptations: {adaptation_percentage:.2f}%\n"
         )
 
@@ -563,7 +568,8 @@ if __name__ == '__main__':
 
         (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
         average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts,
-        w_adp, w_perf, w_res, adaptation_percentage) = q_learning_metrics
+        w_adp, w_perf, w_res, adaptation_percentage, rmax_violations_percantage, cpu_utilization_percentage, containers_percentage, avarage_response_time_new, average_cpu_shares_new) = q_learning_metrics
+
         # Plot and save Q-learning results
         num_iterations = len(costs_per_episode)
         iterations = range(1, num_iterations + 1)
@@ -583,11 +589,11 @@ if __name__ == '__main__':
             f"Q-learning Final Episode Statistics:\n"
             f"Estimated Running Time: {num_episodes} in minutes\n"
             f"Wperf = {w_perf}, Wres = {w_res}, Wadp = {w_adp}, Rmax = {Rmax}\n"
-            f"Rmax Violations: {Rmax_violations[-1] * 100 / num_episodes:.2f}%\n"
-            f"Average CPU Utilization: {average_cpu_utilization[-1]:.2f}%\n"
-            f"Average CPU Shares: {average_cpu_shares[-1]:.2f}%\n"
-            f"Average Number of Containers: {average_num_containers[-1]:.2f}\n"
-            f"Average Response Time: {average_response_time[-1]:.2f} ms\n"
+            f"Rmax Violations: {rmax_violations_percantage:.2f}%\n"
+            f"Average CPU Utilization: {cpu_utilization_percentage:.2f}%\n"
+            f"Average CPU Shares: {average_cpu_shares_new:.2f}%\n"
+            f"Average Number of Containers: {containers_percentage:.2f}\n"
+            f"Average Response Time: {avarage_response_time_new:.2f} ms\n"
             f"Adaptations: {adaptation_percentage:.2f}%\n"
         )
 
@@ -608,7 +614,8 @@ if __name__ == '__main__':
 
         (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
         average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts,
-        w_adp, w_perf, w_res, adaptation_percentage) = q_learning_metrics
+        w_adp, w_perf, w_res, adaptation_percentage, rmax_violations_percantage, cpu_utilization_percentage, containers_percentage, avarage_response_time_new, average_cpu_shares_new) = q_learning_metrics
+
         # Plot and save Q-learning results
         num_iterations = len(costs_per_episode)
         iterations = range(1, num_iterations + 1)
@@ -628,11 +635,11 @@ if __name__ == '__main__':
             f"Q-learning Final Episode Statistics:\n"
             f"Estimated Running Time: {num_episodes} in minutes\n"
             f"Wperf = {w_perf}, Wres = {w_res}, Wadp = {w_adp}, Rmax = {Rmax}\n"
-            f"Rmax Violations: {Rmax_violations[-1] * 100 / num_episodes:.2f}%\n"
-            f"Average CPU Utilization: {average_cpu_utilization[-1]:.2f}%\n"
-            f"Average CPU Shares: {average_cpu_shares[-1]:.2f}%\n"
-            f"Average Number of Containers: {average_num_containers[-1]:.2f}\n"
-            f"Average Response Time: {average_response_time[-1]:.2f} ms\n"
+            f"Rmax Violations: {rmax_violations_percantage:.2f}%\n"
+            f"Average CPU Utilization: {cpu_utilization_percentage:.2f}%\n"
+            f"Average CPU Shares: {average_cpu_shares_new:.2f}%\n"
+            f"Average Number of Containers: {containers_percentage:.2f}\n"
+            f"Average Response Time: {avarage_response_time_new:.2f} ms\n"
             f"Adaptations: {adaptation_percentage:.2f}%\n"
         )
 
