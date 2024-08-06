@@ -17,7 +17,7 @@ if not os.path.exists(log_dir):
     os.makedirs(log_dir)   
 
 timezone = pytz.timezone('Europe/Athens')
-Rmax = 0.50
+Rmax = 0.03 * 1000
 alpha = 0.1
 gamma = 0.99
 epsilon = 1/5
@@ -336,7 +336,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             total_actions += 1
             
-            if performance_penalty > Rmax:
+            if performance_penalty * 1000 > Rmax:
                 Rmax_violation_count += 1
 
             current_state_idx = state_space.index(nearest_state)
