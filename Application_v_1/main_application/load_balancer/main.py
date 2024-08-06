@@ -400,7 +400,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     rmax_violations_percantage = (Rmax_violation_count / total_actions) * 100 if total_actions > 0 else 0
     cpu_utilization_percentage = (total_cpu_utilization / total_actions) * 100 if total_actions > 0 else 0
     containers_percentage = (total_containers / total_actions) * 100 if total_actions > 0 else 0
-    avarage_response_time = (total_response_time / total_actions)
+    avarage_response_time = (total_response_time / total_actions) * 1000
     average_cpu_shares_new = (total_cpu_shares / total_actions)
 
     return (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
