@@ -406,85 +406,95 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     return (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
             average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts,
             w_adp, w_perf, w_res, adaptation_percentage, rmax_violations_percantage, cpu_utilization_percentage, containers_percentage, avarage_response_time, average_cpu_shares_new)
-
     
 def run_baseline(num_episodes):
     episode = 1
-    costs_per_episode = []
     total_time_per_episode = []
-    average_cost_per_episode = []
     Rmax_violations = []
     average_cpu_utilization = []
-    average_cpu_shares = []
-    average_num_containers = []
     average_response_time = []
-    adaptation_counts = []
- 
+    
+    total_actions = 0
+
+    print("Log: Baseling is now starting ...")
+    training_start_time = datetime.now()  # Start time of the entire training
+
     while episode <= num_episodes:
+        print(f'\nLog: Episode: {episode}')
         app_state = state()
-        total_cost = 0
-        total_time = 0
-        total_reward = 0
         total_cpu_utilization = 0
-        total_cpu_shares = 0
-        total_containers = 0
         total_response_time = 0
         steps = 0
-        adaptation_count = 0
         Rmax_violation_count = 0
         next_state = app_state
-        start_time = datetime.now()
+        episode_start_time = datetime.now()  # Start time of the current episode
 
         while True:
-            
+            print("\n")
             current_state = next_state
-            
-            next_state = transition(None)  # No Q-learning action selection
-            
+                
             fetched_data = fetch_data()  # Fetch data once per iteration
             
             _, _, _, performance_penalty, _ = fetched_data
             
             performance_penalty = ensure_performance_penalty_has_data(performance_penalty)
-            
+            print(f'Log: Perfomance Time: {performance_penalty}')
             total_response_time += performance_penalty
-            
-            resource_cost = cres * float(next_state[2])
-            
-            total_cost += w_perf * performance_penalty + w_res * resource_cost
-            
-            total_time += (datetime.now() - start_time).total_seconds()
-            
-            total_reward += total_cost
-            
+            print(f'Log: Total response time: {total_response_time}')
+                        
             total_cpu_utilization += current_state[1]
-            
-            total_cpu_shares += current_state[0]
-            
-            total_containers += current_state[2]
-            
             steps += 1
-            
-            adaptation_count += 1
             
             if performance_penalty > Rmax:
                 Rmax_violation_count += 1
+            
+            time.sleep(10)
+            
+            # Calculate ETA for the episode
+            elapsed_time_episode = (datetime.now() - episode_start_time).total_seconds()
+            average_time_per_step = elapsed_time_episode / steps if steps > 0 else 0
+            remaining_steps = max(0, steps - 1)  # Assuming steps is an integer
+            remaining_time_for_episode = remaining_steps * average_time_per_step
+            eta_for_episode = datetime.now() + timedelta(seconds=remaining_time_for_episode)
 
-            if datetime.now() - start_time > timedelta(minutes=1):
+            # Calculate ETA for all episodes
+            elapsed_time_total = (datetime.now() - training_start_time).total_seconds()
+            average_time_per_episode = elapsed_time_total / episode if episode > 0 else 0
+            remaining_episodes = num_episodes - episode
+            remaining_time_for_all_episodes = remaining_episodes * average_time_per_episode
+            eta_for_all_episodes = datetime.now() + timedelta(seconds=remaining_time_for_all_episodes)
+
+            athens_tz = pytz.timezone('Europe/Athens')
+            eta_episode_athens = eta_for_episode.astimezone(athens_tz)
+            eta_all_episodes_athens = eta_for_all_episodes.astimezone(athens_tz)
+
+            print(f"\nLog: Episode: {episode}, ETA for current episode: {eta_episode_athens}, \nLog: ETA for all episodes: {eta_all_episodes_athens}")
+            print(f'Log: Average response time of current episode: {total_response_time / steps}')
+            print(f'Log: Average response time for all episodes so far: {total_response_time / steps}')
+            
+            total_actions += 1
+            
+            if elapsed_time_episode > 60 or steps >= 1000:
                 break
 
-        episode += 1
-        costs_per_episode.append(total_cost / steps)
-        total_time_per_episode.append(total_time / steps)
-        average_cost_per_episode.append(total_reward / steps)
-        Rmax_violations.append(Rmax_violation_count)
-        average_cpu_utilization.append(total_cpu_utilization / steps)
-        average_cpu_shares.append(total_cpu_shares / steps)
-        average_num_containers.append(total_containers / steps)
-        average_response_time.append(total_response_time / steps)
-        adaptation_counts.append(adaptation_count / steps)
+        if steps > 0:
+            total_time_per_episode.append(elapsed_time_episode / steps)
+            Rmax_violations.append(Rmax_violation_count / steps)
+            average_cpu_utilization.append(total_cpu_utilization / steps)
+            average_response_time.append(total_response_time / steps)
+        else:
+            total_time_per_episode.append(0)
+            Rmax_violations.append(0)
+            average_cpu_utilization.append(0)
+            average_response_time.append(0)
 
-    return costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations, average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts
+        episode += 1
+
+    rmax_violations_percantage = (Rmax_violation_count / total_actions) * 100 if total_actions > 0 else 0
+    cpu_utilization_percentage = (total_cpu_utilization / total_actions) * 100 if total_actions > 0 else 0
+    avarage_response_time = (total_response_time / total_actions) * 1000
+
+    return (total_time_per_episode, Rmax_violations, average_cpu_utilization, average_response_time, rmax_violations_percantage, cpu_utilization_percentage, avarage_response_time)
 
 def plot_metric(iterations, metric, ylabel, title, filename):
     plt.figure(figsize=(10, 6))
@@ -561,7 +571,7 @@ if __name__ == '__main__':
     reset_environment_to_initial_state()
     
     if run_second:
-                # Initialize Q-table
+        # Initialize Q-table
         Q = np.zeros((len(state_space), len(action_space)))
         # Run Q-learning and gather metrics
         q_learning_metrics = run_q_learning(num_episodes, w_perf=0.09, w_adp=0.01, w_res=0.90)
@@ -607,7 +617,6 @@ if __name__ == '__main__':
 
     if run_third:
         # Initialize Q-table
-                # Initialize Q-table
         Q = np.zeros((len(state_space), len(action_space)))
         # Run Q-learning and gather metrics
         q_learning_metrics = run_q_learning(num_episodes, w_perf=0.09, w_adp=0.01, w_res=0.90)
@@ -657,31 +666,25 @@ if __name__ == '__main__':
         baseline_metrics = run_baseline(num_episodes)
         
         # Extract metrics
-        costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations, average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts = baseline_metrics
+        total_time_per_episode, Rmax_violations, average_cpu_utilization, average_response_time, rmax_violations_percantage, cpu_utilization_percentage, avarage_response_time= baseline_metrics
         
         num_iterations = len(costs_per_episode)
         iterations = range(1, num_iterations + 1)
         
         # Plot and save baseline results
-        plot_metric(iterations, costs_per_episode, 'Total Cost', 'Total Cost per Episode (Baseline)', '/app/plots/total_cost_per_episode_baseline.png')
         plot_metric(iterations, total_time_per_episode, 'Total Time', 'Total Time per Episode (Baseline)', '/app/plots/total_time_per_episode_baseline.png')
-        plot_metric(iterations, average_cost_per_episode, 'Average Cost', 'Average Cost per Episode (Baseline)', '/app/plots/average_cost_per_episode_baseline.png')
         plot_metric(iterations, Rmax_violations, 'Rmax Violations (%)', 'Rmax Violations per Episode (Baseline)', '/app/plots/rmax_violations_per_episode_baseline.png')
         plot_metric(iterations, average_cpu_utilization, 'Average CPU Utilization (%)', 'Average CPU Utilization per Episode (Baseline)', '/app/plots/average_cpu_utilization_per_episode_baseline.png')
-        plot_metric(iterations, average_cpu_shares, 'Average CPU Shares (%)', 'Average CPU Shares per Episode (Baseline)', '/app/plots/average_cpu_shares_per_episode_baseline.png')
         plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode (Baseline)', '/app/plots/average_num_containers_per_episode_baseline.png')
         plot_metric(iterations, average_response_time, 'Average Response Time (ms)', 'Average Response Time per Episode (Baseline)', '/app/plots/average_response_time_per_episode_baseline.png')
-        plot_metric(iterations, adaptation_counts, 'Adaptations (%)', 'Adaptations per Episode (Baseline)', '/app/plots/adaptations_per_episode_baseline.png')
 
         # Prepare final episode statistics for baseline
         baseline_statistics = (
             f"Baseline Final Episode Statistics:\n"
             f"Rmax Violations: {Rmax_violations[-1] * 100 / num_episodes:.2f}%\n"
             f"Average CPU Utilization: {average_cpu_utilization[-1]:.2f}%\n"
-            f"Average CPU Shares: {average_cpu_shares[-1]:.2f}%\n"
             f"Average Number of Containers: {average_num_containers[-1]:.2f}\n"
             f"Average Response Time: {average_response_time[-1]:.2f} ms\n"
-            f"Adaptations: {adaptation_counts[-1] * 100 / num_episodes:.2f}%\n"
         )
 
         # Save final episode statistics for baseline to a log file
