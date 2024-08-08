@@ -1,6 +1,7 @@
 #the adaptation cost cadp, which accounts for the application unavailability following an adaptation.
 
 def is_vertical_scaling(action):
+    print(f'Log: Vertical scaling occured: action {action}')
     return action != 0 and action != 2
 
 def indicator_vertical_scaling(action):
@@ -15,14 +16,14 @@ class Costs:
     def overall_cost_function(wadp, wperf, wres, k_next_state, u_next_state, c_next_state, action, a1, a2, Rmax, Kmax, R):
         # action2_sum = sum(sum(inner_list) for inner_list in a2)
         # Term 1
-        term1 = wadp * indicator_vertical_scaling(action)
-        #print(f'term1:{term1}')
+        term1 = wadp * is_vertical_scaling(action)
+        print(f'Log: Term1:{term1}')
         # Term 2
         term2 = wperf * indicator_resource_performance(a1, a2, k_next_state, u_next_state, c_next_state, Rmax, R)
-        #print(f'term2:{term2}')
+        print(f'Log: Term2:{term2}')
         # Term 3
         term3 = wres * (k_next_state + a1) * (c_next_state + a2) / Kmax
-        #print(f'term3:{term3}')
+        print(f'Log: Term3:{term3}')
         # Overall cost
         cost = term1 + term2 + term3
         return cost

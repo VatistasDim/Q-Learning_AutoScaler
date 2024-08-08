@@ -17,7 +17,7 @@ if not os.path.exists(log_dir):
     os.makedirs(log_dir)   
 
 timezone = pytz.timezone('Europe/Athens')
-Rmax = 0.03 * 1000
+Rmax = 0.05 * 1000
 alpha = 0.1
 gamma = 0.99
 epsilon = 1/5
@@ -281,7 +281,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     training_start_time = datetime.now()  # Start time of the entire training
 
     while episode <= num_episodes:
-        print(f'\nLog: Episode: {episode}')
+        print(f'Log: Episode: {episode}')
         app_state = state()
         total_cost = 0
         total_reward = 0
@@ -303,7 +303,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             next_state = transition(action)
             
             if not was_transition_succefull:
-                print('Info: No action because no transition was made.')
+                print('Log: No action because no transition was made.')
                 action = 0
                 
             fetched_data = fetch_data()  # Fetch data once per iteration
@@ -322,7 +322,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             total_cost += cost
             print(f'Log: Cost: {cost}, action: {action}')
-            print(f'Total Cost: {total_cost}')
+            print(f'Log: Total Cost: {total_cost}')
             
             total_reward += cost
             total_cpu_utilization += current_state[1]
@@ -338,6 +338,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             if performance_penalty * 1000 > Rmax:
                 Rmax_violation_count += 1
+                print(f'Log: Rmax violation occured: Response time: {performance_penalty}, Rmax: {Rmax}, Total number of Violations: {Rmax_violation_count}')
 
             current_state_idx = state_space.index(nearest_state)
             next_state_idx = state_space.index(find_nearest_state(next_state, state_space))
