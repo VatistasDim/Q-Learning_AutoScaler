@@ -336,11 +336,11 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
                 total_adaptations += 1
             
             total_actions += 1
-            
+            print(f'Log: Response time in seconds {performance_penalty} | Response time in ms {performance_penalty * 1000}')
             if performance_penalty * 1000 > Rmax:
                 Rmax_violation_count += 1
                 total_Rmax_violations += 1
-                print(f'Log: Rmax violation occured: Response time: {performance_penalty / 1000:.2f} ms, Rmax: {Rmax / 1000} ms, Total number of Violations: {Rmax_violation_count}')
+                print(f'Log: Rmax violation occured: Response time: {performance_penalty:.2f} ms, Rmax: {Rmax / 1000} ms, Total number of Violations: {Rmax_violation_count}')
 
             current_state_idx = state_space.index(nearest_state)
             next_state_idx = state_space.index(find_nearest_state(next_state, state_space))
