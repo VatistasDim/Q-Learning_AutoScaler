@@ -318,7 +318,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             a1 = 1 if action in [1, -1] else 0
             a2 = 1 if action in [-512, 512] else 0
             
-            cost = Costs.overall_cost_function(w_adp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)
+            cost = Costs.overall_cost_function(w_adp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty * 1000)
             
             total_cost += cost
             print(f'Log: Cost: {cost}, action: {action}')
@@ -338,7 +338,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             if performance_penalty * 1000 > Rmax:
                 Rmax_violation_count += 1
-                print(f'Log: Rmax violation occured: Response time: {performance_penalty}, Rmax: {Rmax}, Total number of Violations: {Rmax_violation_count}')
+                print(f'Log: Rmax violation occured: Response time: {performance_penalty:.2f} ms, Rmax: {Rmax:.2f} ms, Total number of Violations: {Rmax_violation_count}')
 
             current_state_idx = state_space.index(nearest_state)
             next_state_idx = state_space.index(find_nearest_state(next_state, state_space))
