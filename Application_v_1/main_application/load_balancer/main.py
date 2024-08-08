@@ -275,7 +275,12 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     adaptation_counts = []
 
     total_adaptations = 0
+    total_Rmax_violations = 0
+    total_cpu_utilization = 0
     total_actions = 0
+    total_containers = 0
+    total_cpu_shares = 0
+    total_response_time = 0
 
     print("Log: Training Starting ...")
     training_start_time = datetime.now()  # Start time of the entire training
@@ -285,10 +290,6 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         app_state = state()
         total_cost = 0
         total_reward = 0
-        total_cpu_utilization = 0
-        total_cpu_shares = 0
-        total_containers = 0
-        total_response_time = 0
         steps = 0
         adaptation_count = 0
         Rmax_violation_count = 0
@@ -338,7 +339,8 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             if performance_penalty * 1000 > Rmax:
                 Rmax_violation_count += 1
-                print(f'Log: Rmax violation occured: Response time: {performance_penalty:.2f} ms, Rmax: {Rmax:.2f} ms, Total number of Violations: {Rmax_violation_count}')
+                total_Rmax_violations += 1
+                print(f'Log: Rmax violation occured: Response time: {performance_penalty / 1000:.2f} ms, Rmax: {Rmax / 1000} ms, Total number of Violations: {Rmax_violation_count}')
 
             current_state_idx = state_space.index(nearest_state)
             next_state_idx = state_space.index(find_nearest_state(next_state, state_space))
@@ -398,7 +400,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         episode += 1
 
     adaptation_percentage = (total_adaptations / total_actions) * 100 if total_actions > 0 else 0
-    rmax_violations_percantage = (Rmax_violation_count / total_actions) * 100 if total_actions > 0 else 0
+    rmax_violations_percantage = (total_Rmax_violations / total_actions) * 100 if total_actions > 0 else 0
     cpu_utilization_percentage = (total_cpu_utilization / total_actions) * 100 if total_actions > 0 else 0
     containers_percentage = (total_containers / total_actions) * 100 if total_actions > 0 else 0
     avarage_response_time = (total_response_time / total_actions) * 1000
