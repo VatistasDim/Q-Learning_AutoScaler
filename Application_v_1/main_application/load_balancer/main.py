@@ -17,7 +17,7 @@ if not os.path.exists(log_dir):
     os.makedirs(log_dir)   
 
 timezone = pytz.timezone('Europe/Athens')
-Rmax = 0.05 * 1000
+Rmax = 0.9 # 900 ms
 alpha = 0.1
 gamma = 0.99
 epsilon = 1/5
@@ -336,11 +336,11 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
                 total_adaptations += 1
             
             total_actions += 1
-            print(f'Log: Response time in seconds {performance_penalty} | Response time in ms {performance_penalty * 1000}')
-            if performance_penalty * 1000 > Rmax:
+            print(f'Log: Response time: {performance_penalty:.2f} ms')
+            if performance_penalty > Rmax:
                 Rmax_violation_count += 1
                 total_Rmax_violations += 1
-                print(f'Log: Rmax violation occured: Response time: {performance_penalty:.2f} ms, Rmax: {Rmax / 1000} ms, Total number of Violations: {Rmax_violation_count}')
+                print(f'Log: Rmax violation occured: Response time: {performance_penalty:.2f} ms, Rmax: {Rmax} ms, Total number of Violations: {Rmax_violation_count}')
 
             current_state_idx = state_space.index(nearest_state)
             next_state_idx = state_space.index(find_nearest_state(next_state, state_space))
@@ -369,9 +369,9 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             eta_all_episodes_athens = eta_for_all_episodes.astimezone(athens_tz)
 
             print(f"\nLog: Episode: {episode}, ETA for current episode: {eta_episode_athens}, \nLog: ETA for all episodes: {eta_all_episodes_athens}")
-            print(f'Log: Average response time of current episode: {total_response_time / steps}')
-            print(f'Log: Average response time for all episodes so far: {total_response_time / steps}')
-            print(f'Log: Average adaptations so far: {(total_adaptations / total_actions) * 100 if total_actions > 0 else 0}%')
+            print(f'Log: Average response time of current episode: {total_response_time / steps:.2f}')
+            print(f'Log: Average response time for all episodes so far: {total_response_time / steps:.2f}')
+            print(f'Log: Average adaptations so far: {(total_adaptations / total_actions) * 100 if total_actions > 0 else 0:.2f}%')
             
             if elapsed_time_episode > 60 or steps >= 1000:
                 break
@@ -403,7 +403,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     rmax_violations_percantage = (total_Rmax_violations / total_actions) * 100 if total_actions > 0 else 0
     cpu_utilization_percentage = (total_cpu_utilization / total_actions) * 100 if total_actions > 0 else 0
     containers_percentage = (total_containers / total_actions) * 100 if total_actions > 0 else 0
-    avarage_response_time = (total_response_time / total_actions) * 1000
+    avarage_response_time = (total_response_time / total_actions)
     average_cpu_shares_new = (total_cpu_shares / total_actions)
 
     return (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
@@ -495,7 +495,7 @@ def run_baseline(num_episodes):
 
     rmax_violations_percantage = (Rmax_violation_count / total_actions) * 100 if total_actions > 0 else 0
     cpu_utilization_percentage = (total_cpu_utilization / total_actions) * 100 if total_actions > 0 else 0
-    avarage_response_time = (total_response_time / total_actions) * 1000
+    avarage_response_time = (total_response_time / total_actions)
 
     return (total_time_per_episode, Rmax_violations, average_cpu_utilization, average_response_time, rmax_violations_percantage, cpu_utilization_percentage, avarage_response_time)
 
