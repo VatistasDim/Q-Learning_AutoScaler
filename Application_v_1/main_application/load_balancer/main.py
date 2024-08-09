@@ -275,10 +275,10 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     adaptation_counts = []
     average_cpu_utilization_per_episode = []
     average_rmax_violations_per_episode = []
+    avarage_containers_per_episode = []
 
     total_adaptations = 0
     total_actions = 0
-    total_containers = 0
     total_cpu_shares = 0
     total_response_time = 0
 
@@ -290,6 +290,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         app_state = state()
         total_cpu_utilization = 0
         total_Rmax_violations = 0
+        total_containers = 0
         total_cost = 0
         total_reward = 0
         steps = 0
@@ -398,6 +399,9 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             rmax_violation_percentage_for_episode = (Rmax_violation_count / steps) * 100
             # Store the episode-level Rmax violation percentage
             average_rmax_violations_per_episode.append(rmax_violation_percentage_for_episode)
+            
+            avarage_containers_for_episode = (total_containers / steps)
+            avarage_containers_per_episode.append(avarage_containers_for_episode)
 
         else:
             costs_per_episode.append(0)
@@ -415,13 +419,13 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     adaptation_percentage = (total_adaptations / total_actions) * 100 if total_actions > 0 else 0
     final_average_rmax_violations = sum(average_rmax_violations_per_episode) / len(average_rmax_violations_per_episode)
     final_average_cpu_utilization = sum(average_cpu_utilization_per_episode) / len(average_cpu_utilization_per_episode)
-    containers_percentage = (total_containers / total_actions) * 100 if total_actions > 0 else 0
+    final_avarage_containers = sum(avarage_containers_per_episode) / len(avarage_containers_per_episode)
     avarage_response_time = (total_response_time / total_actions)
     average_cpu_shares_new = (total_cpu_shares / total_actions)
 
     return (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
             average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time, adaptation_counts,
-            w_adp, w_perf, w_res, adaptation_percentage, final_average_rmax_violations, final_average_cpu_utilization, containers_percentage, avarage_response_time, average_cpu_shares_new)
+            w_adp, w_perf, w_res, adaptation_percentage, final_average_rmax_violations, final_average_cpu_utilization, final_avarage_containers, avarage_response_time, average_cpu_shares_new)
     
 def run_baseline(num_episodes):
     episode = 1
