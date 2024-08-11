@@ -397,9 +397,9 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             # Calculate the Rmax violation percentage for the episode
             rmax_violation_percentage_for_episode = (Rmax_violation_count / steps) * 100
-            # Store the episode-level Rmax violation percentage
             average_rmax_violations_per_episode.append(rmax_violation_percentage_for_episode)
             
+            # Calculate the avarage contaners
             avarage_containers_for_episode = (total_containers / steps)
             avarage_containers_per_episode.append(avarage_containers_for_episode)
 
@@ -430,13 +430,12 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
 def run_baseline(num_episodes):
     episode = 1
     total_time_per_episode = []
-    Rmax_violations = []
-    average_cpu_utilization = []
+    average_rmax_violations_per_episode = []
+    average_cpu_utilization_per_episode = []
     average_response_time = []
-    
     total_actions = 0
 
-    print("Log: Baseling is now starting ...")
+    print("Log: Baseline is now starting ...")
     training_start_time = datetime.now()  # Start time of the entire training
 
     while episode <= num_episodes:
@@ -458,7 +457,7 @@ def run_baseline(num_episodes):
             _, _, _, performance_penalty, _ = fetched_data
             
             performance_penalty = ensure_performance_penalty_has_data(performance_penalty)
-            print(f'Log: Perfomance Time: {performance_penalty}')
+            print(f'Log: Performance Time: {performance_penalty}')
             total_response_time += performance_penalty
             print(f'Log: Total response time: {total_response_time}')
                         
@@ -498,23 +497,37 @@ def run_baseline(num_episodes):
                 break
 
         if steps > 0:
+            # Calculate and store average CPU utilization for the episode
+            average_cpu_utilization_for_episode = total_cpu_utilization / steps
+            average_cpu_utilization_for_episode = min(average_cpu_utilization_for_episode, 100)  # Cap at 100%
+            average_cpu_utilization_per_episode.append(average_cpu_utilization_for_episode)
+
+            # Calculate and store Rmax violation percentage for the episode
+            rmax_violation_percentage_for_episode = (Rmax_violation_count / steps) * 100
+            average_rmax_violations_per_episode.append(rmax_violation_percentage_for_episode)
+
+            # Store other episode-level metrics
             total_time_per_episode.append(elapsed_time_episode / steps)
-            Rmax_violations.append(Rmax_violation_count / steps)
-            average_cpu_utilization.append(total_cpu_utilization / steps)
             average_response_time.append(total_response_time / steps)
         else:
             total_time_per_episode.append(0)
-            Rmax_violations.append(0)
-            average_cpu_utilization.append(0)
+            average_rmax_violations_per_episode.append(0)
+            average_cpu_utilization_per_episode.append(0)
             average_response_time.append(0)
 
         episode += 1
 
-    rmax_violations_percantage = (Rmax_violation_count / total_actions) * 100 if total_actions > 0 else 0
-    cpu_utilization_percentage = (total_cpu_utilization / total_actions) * 100 if total_actions > 0 else 0
-    avarage_response_time = (total_response_time / total_actions)
+    # Calculate the overall average CPU utilization across all episodes
+    final_average_cpu_utilization = sum(average_cpu_utilization_per_episode) / len(average_cpu_utilization_per_episode)
 
-    return (total_time_per_episode, Rmax_violations, average_cpu_utilization, average_response_time, rmax_violations_percantage, cpu_utilization_percentage, avarage_response_time)
+    # Calculate the overall average Rmax violations across all episodes
+    final_average_rmax_violations = sum(average_rmax_violations_per_episode) / len(average_rmax_violations_per_episode)
+
+    # Calculate the overall average response time across all episodes
+    final_average_response_time = sum(average_response_time) / len(average_response_time)
+
+    return (total_time_per_episode, average_rmax_violations_per_episode, average_cpu_utilization_per_episode, average_response_time,
+            final_average_rmax_violations, final_average_cpu_utilization, final_average_response_time)
 
 def plot_metric(iterations, metric, ylabel, title, filename):
     plt.figure(figsize=(10, 6))
