@@ -17,7 +17,8 @@ if not os.path.exists(log_dir):
     os.makedirs(log_dir)   
 
 timezone = pytz.timezone('Europe/Athens')
-Rmax = 0.9 # 900 ms
+Rmax = 1.3 # 900 ms
+seconds_for_next_episode = 180 # Determines the seconds for the next episode to begin. 
 alpha = 0.1
 gamma = 0.99
 epsilon = 1/5
@@ -339,11 +340,11 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
                 total_adaptations += 1
             
             total_actions += 1
-            print(f'Log: Response time: {performance_penalty:.2f} ms')
+            print(f'Log: Response time: {performance_penalty:.2f}s')
             if performance_penalty > Rmax:
                 Rmax_violation_count += 1
                 total_Rmax_violations += 1
-                print(f'Log: Rmax violation occured: Response time: {performance_penalty:.2f} ms, Rmax: {Rmax} ms, Total number of Violations: {Rmax_violation_count}')
+                print(f'Log: Rmax violation occured: Response time: {performance_penalty:.2f}s, Rmax: {Rmax}s, Total number of Violations: {Rmax_violation_count}')
 
             current_state_idx = state_space.index(nearest_state)
             next_state_idx = state_space.index(find_nearest_state(next_state, state_space))
@@ -376,7 +377,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             print(f'Log: Average response time for all episodes so far: {total_response_time / steps:.2f}')
             print(f'Log: Average adaptations so far: {(total_adaptations / total_actions) * 100 if total_actions > 0 else 0:.2f}%')
             
-            if elapsed_time_episode > 60 or steps >= 1000:
+            if elapsed_time_episode > seconds_for_next_episode or steps >= 1000:
                 break
 
         if steps > 0:
@@ -493,7 +494,7 @@ def run_baseline(num_episodes):
             
             total_actions += 1
             
-            if elapsed_time_episode > 60 or steps >= 1000:
+            if elapsed_time_episode > seconds_for_next_episode or steps >= 1000:
                 break
 
         if steps > 0:
@@ -548,7 +549,7 @@ if __name__ == '__main__':
     
     reset_environment_to_initial_state()
     
-    num_episodes = 40 
+    num_episodes = 120 
 
     baseline = True
     
@@ -579,7 +580,7 @@ if __name__ == '__main__':
         plot_metric(iterations, average_cpu_utilization, 'Average CPU Utilization (%)', 'Average CPU Utilization per Episode', '/app/plots/average_cpu_utilization_per_episode_first.png')
         plot_metric(iterations, average_cpu_shares, 'Average CPU Shares (%)', 'Average CPU Shares per Episode', '/app/plots/average_cpu_shares_per_episode_first.png')
         plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode', '/app/plots/average_num_containers_per_episode_first.png')
-        plot_metric(iterations, average_response_time, 'Average Response Time (ms)', 'Average Response Time per Episode', '/app/plots/average_response_time_per_episode_first.png')
+        plot_metric(iterations, average_response_time, 'Average Response Time (s)', 'Average Response Time per Episode', '/app/plots/average_response_time_per_episode_first.png')
         plot_metric(iterations, adaptation_counts, 'Adaptations (%)', 'Adaptations per Episode', '/app/plots/adaptations_per_episode_first.png')
 
         # Prepare final episode statistics
@@ -589,9 +590,9 @@ if __name__ == '__main__':
             f"Wperf = {w_perf}, Wres = {w_res}, Wadp = {w_adp}, Rmax = {Rmax}\n"
             f"Rmax Violations: {rmax_violations_percantage:.2f}%\n"
             f"Average CPU Utilization: {cpu_utilization_percentage:.2f}%\n"
-            f"Average CPU Shares: {average_cpu_shares_new:.2f}%\n"
+            f"Average CPU Shares: {average_cpu_shares_new:.2f}\n"
             f"Average Number of Containers: {containers_percentage:.2f}\n"
-            f"Average Response Time: {avarage_response_time_new:.2f} ms\n"
+            f"Average Response Time: {avarage_response_time_new:.2f} s\n"
             f"Adaptations: {adaptation_percentage:.2f}%\n"
         )
 
