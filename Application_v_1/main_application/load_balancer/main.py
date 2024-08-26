@@ -35,14 +35,15 @@ max_containers = 11
 
 # Define the ranges for CPU utilization, number of running containers, and CPU shares
 cpu_utilization_values = range(101)  # CPU utilization values from 0 to 100
+cpu_utilization_bins = np.digitize(cpu_utilization_values, bins=np.linspace(0, 100, num=11))  # 10 bins
 k_range = range(1, max_containers)  # Number of running containers (1 to 10)
 cpu_shares_values = [1024, 512, 256, 128]  # CPU shares (1024, 512, 256, 128)
 
-# Discretize CPU utilization into bins
-cpu_utilization_bins = np.digitize(cpu_utilization_values, bins=np.linspace(0, 100, num=11))  # 10 bins
-# Combine features into composite features
-load_per_container = cpu_utilization_bins / np.array(k_range)
-# Generate the refined state space
+load_per_container = [
+    cpu_utilization / k
+    for cpu_utilization, k in itertools.product(cpu_utilization_bins, k_range)
+]
+
 state_space = list(itertools.product(cpu_shares_values, load_per_container))
 
 # Generate all combinations of CPU utilization, K, and CPU shares
