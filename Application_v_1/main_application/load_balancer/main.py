@@ -17,11 +17,11 @@ if not os.path.exists(log_dir):
     os.makedirs(log_dir)   
 
 timezone = pytz.timezone('Europe/Athens')
-Rmax = 0.80 # 800 ms
+Rmax = 1.3 # 900 ms
 seconds_for_next_episode = 120 # Determines the seconds for the next episode to begin. 
 alpha = 0.1
 gamma = 0.99
-epsilon = 0.6
+epsilon = 1/5
 cres = 0.01
 wait_time = 15
 url = 'http://prometheus:9090/api/v1/query'
@@ -37,6 +37,7 @@ max_containers = 11
 cpu_utilization_values = range(101)  # CPU utilization values from 0 to 100
 k_range = range(1, max_containers)  # Number of running containers (1 to 10)
 cpu_shares_values = [1024, 512, 256, 128]  # CPU shares (1024, 512, 256, 128)
+
 # Generate all combinations of CPU utilization, K, and CPU shares
 state_space = list(itertools.product(cpu_shares_values, cpu_utilization_values, k_range))
 action_space = [-1, 0, 1, -512, 512]  # Actions: -1 (scale in), 0 (do nothing), 1 (scale out), -512 (decrease CPU shares), 512 (increase CPU shares)
@@ -302,7 +303,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             print("\n")
             current_state = next_state
             nearest_state = find_nearest_state(current_state, state_space)
-            action = select_action(Q, current_state, epsilon)
+            action = select_action(Q, nearest_state, epsilon)
             next_state = transition(action)
             
             if not was_transition_succefull:
@@ -347,9 +348,9 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             current_state_idx = state_space.index(nearest_state)
             next_state_idx = state_space.index(find_nearest_state(next_state, state_space))
             
-            Q[current_state, action_space.index(action)] = (
-                (1 - alpha) * Q[current_state, action_space.index(action)] +
-                alpha * (cost + gamma * min(Q[next_state, :]))
+            Q[current_state_idx, action_space.index(action)] = (
+                (1 - alpha) * Q[current_state_idx, action_space.index(action)] +
+                alpha * (cost + gamma * min(Q[next_state_idx, :]))
             )
             
             # Calculate ETA for the episode
