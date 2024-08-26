@@ -21,7 +21,9 @@ Rmax = 1.3 # 900 ms
 seconds_for_next_episode = 120 # Determines the seconds for the next episode to begin. 
 alpha = 0.1
 gamma = 0.99
-epsilon = 1/5
+epsilon_start = 1.0  # Starting value of epsilon
+epsilon_end = 0.1    # Minimum value of epsilon
+epsilon_decay = 0.995  # Decay factor per episode
 cres = 0.01
 wait_time = 15
 url = 'http://prometheus:9090/api/v1/query'
@@ -282,6 +284,9 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     total_cpu_shares = 0
     total_response_time = 0
 
+    # Epsilon parameters
+    epsilon = epsilon_start  # Start with the initial epsilon value
+
     print("Log: Training Starting ...")
     training_start_time = datetime.now()  # Start time of the entire training
 
@@ -413,6 +418,9 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             average_num_containers.append(0)
             average_response_time.append(0)
             adaptation_counts.append(0)
+
+        # Decay epsilon after each episode
+        epsilon = max(epsilon_end, epsilon * epsilon_decay)
 
         episode += 1
 
