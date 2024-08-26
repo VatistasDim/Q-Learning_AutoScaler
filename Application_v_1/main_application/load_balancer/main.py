@@ -17,11 +17,11 @@ if not os.path.exists(log_dir):
     os.makedirs(log_dir)   
 
 timezone = pytz.timezone('Europe/Athens')
-Rmax = 0.75 # 750 ms
+Rmax = 0.80 # 800 ms
 seconds_for_next_episode = 120 # Determines the seconds for the next episode to begin. 
 alpha = 0.1
 gamma = 0.99
-epsilon = 1/5
+epsilon = 0.6
 cres = 0.01
 wait_time = 15
 url = 'http://prometheus:9090/api/v1/query'
@@ -35,19 +35,10 @@ max_containers = 11
 
 # Define the ranges for CPU utilization, number of running containers, and CPU shares
 cpu_utilization_values = range(101)  # CPU utilization values from 0 to 100
-cpu_utilization_bins = np.digitize(cpu_utilization_values, bins=np.linspace(0, 100, num=11))  # 10 bins
 k_range = range(1, max_containers)  # Number of running containers (1 to 10)
 cpu_shares_values = [1024, 512, 256, 128]  # CPU shares (1024, 512, 256, 128)
-
-load_per_container = [
-    cpu_utilization / k
-    for cpu_utilization, k in itertools.product(cpu_utilization_bins, k_range)
-]
-
-state_space = list(itertools.product(cpu_shares_values, load_per_container))
-
 # Generate all combinations of CPU utilization, K, and CPU shares
-# state_space = list(itertools.product(cpu_shares_values, cpu_utilization_values, k_range))
+state_space = list(itertools.product(cpu_shares_values, cpu_utilization_values, k_range))
 action_space = [-1, 0, 1, -512, 512]  # Actions: -1 (scale in), 0 (do nothing), 1 (scale out), -512 (decrease CPU shares), 512 (increase CPU shares)
 
 # Initialize Q-table
@@ -257,10 +248,10 @@ def state():
     k_running_containers = get_current_replica_count(service_prefix=service_name)
     return c_cpu_shares, u_cpu_utilization, k_running_containers
 
-# def find_nearest_state(state, state_space):
-#     distances = [sum(abs(np.array(state) - np.array(s))) for s in state_space]
-#     nearest_index = np.argmin(distances)
-#     return state_space[nearest_index]
+def find_nearest_state(state, state_space):
+    distances = [sum(abs(np.array(state) - np.array(s))) for s in state_space]
+    nearest_index = np.argmin(distances)
+    return state_space[nearest_index]
 
 def ensure_performance_penalty_has_data(performance_data):
     while performance_data is None or np.isnan(performance_data):
@@ -310,7 +301,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         while True:
             print("\n")
             current_state = next_state
-            # nearest_state = find_nearest_state(current_state, state_space)
+            nearest_state = find_nearest_state(current_state, state_space)
             action = select_action(Q, current_state, epsilon)
             next_state = transition(action)
             
@@ -353,8 +344,8 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
                 total_Rmax_violations += 1
                 print(f'Log: Rmax violation occured: Response time: {performance_penalty:.2f}s, Rmax: {Rmax}s, Total number of Violations: {Rmax_violation_count}')
 
-            # current_state_idx = state_space.index(nearest_state)
-            # next_state_idx = state_space.index(find_nearest_state(next_state, state_space))
+            current_state_idx = state_space.index(nearest_state)
+            next_state_idx = state_space.index(find_nearest_state(next_state, state_space))
             
             Q[current_state, action_space.index(action)] = (
                 (1 - alpha) * Q[current_state, action_space.index(action)] +
