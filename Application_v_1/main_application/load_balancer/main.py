@@ -17,7 +17,7 @@ if not os.path.exists(log_dir):
     os.makedirs(log_dir)   
 
 timezone = pytz.timezone('Europe/Athens')
-Rmax = 1.3 # 900 ms
+Rmax = 0.80 # 800 ms
 seconds_for_next_episode = 120 # Determines the seconds for the next episode to begin. 
 alpha = 0.1
 gamma = 0.99
