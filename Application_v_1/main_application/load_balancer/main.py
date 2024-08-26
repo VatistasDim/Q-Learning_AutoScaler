@@ -17,7 +17,7 @@ if not os.path.exists(log_dir):
     os.makedirs(log_dir)   
 
 timezone = pytz.timezone('Europe/Athens')
-Rmax = 1.3 # 900 ms
+Rmax = 0.75 # 750 ms
 seconds_for_next_episode = 120 # Determines the seconds for the next episode to begin. 
 alpha = 0.1
 gamma = 0.99
@@ -38,8 +38,15 @@ cpu_utilization_values = range(101)  # CPU utilization values from 0 to 100
 k_range = range(1, max_containers)  # Number of running containers (1 to 10)
 cpu_shares_values = [1024, 512, 256, 128]  # CPU shares (1024, 512, 256, 128)
 
+# Discretize CPU utilization into bins
+cpu_utilization_bins = np.digitize(cpu_utilization_values, bins=np.linspace(0, 100, num=11))  # 10 bins
+# Combine features into composite features
+load_per_container = cpu_utilization_bins / np.array(k_range)
+# Generate the refined state space
+state_space = list(itertools.product(cpu_shares_values, load_per_container))
+
 # Generate all combinations of CPU utilization, K, and CPU shares
-state_space = list(itertools.product(cpu_shares_values, cpu_utilization_values, k_range))
+# state_space = list(itertools.product(cpu_shares_values, cpu_utilization_values, k_range))
 action_space = [-1, 0, 1, -512, 512]  # Actions: -1 (scale in), 0 (do nothing), 1 (scale out), -512 (decrease CPU shares), 512 (increase CPU shares)
 
 # Initialize Q-table
