@@ -18,7 +18,7 @@ if not os.path.exists(log_dir):
 
 timezone = pytz.timezone('Europe/Athens')
 Rmax = 1.3 # 900 ms
-seconds_for_next_episode = 180 # Determines the seconds for the next episode to begin. 
+seconds_for_next_episode = 120 # Determines the seconds for the next episode to begin. 
 alpha = 0.1
 gamma = 0.99
 epsilon = 1/5
@@ -80,7 +80,6 @@ def transition(action):
     new_cpu_shares = get_current_cpu_shares(service_name)
     print(f"Log: New CPU shares after action: {new_cpu_shares}")
     return (c, u, k)
-
 
 def increase_cpu_share_step(current_cpu_share):
     print(f'Log: increase_cpu_share_step --> current_cpu_share:{current_cpu_share}')
