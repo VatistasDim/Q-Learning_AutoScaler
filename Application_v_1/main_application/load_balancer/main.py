@@ -257,10 +257,10 @@ def state():
     k_running_containers = get_current_replica_count(service_prefix=service_name)
     return c_cpu_shares, u_cpu_utilization, k_running_containers
 
-def find_nearest_state(state, state_space):
-    distances = [sum(abs(np.array(state) - np.array(s))) for s in state_space]
-    nearest_index = np.argmin(distances)
-    return state_space[nearest_index]
+# def find_nearest_state(state, state_space):
+#     distances = [sum(abs(np.array(state) - np.array(s))) for s in state_space]
+#     nearest_index = np.argmin(distances)
+#     return state_space[nearest_index]
 
 def ensure_performance_penalty_has_data(performance_data):
     while performance_data is None or np.isnan(performance_data):
@@ -310,8 +310,8 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         while True:
             print("\n")
             current_state = next_state
-            nearest_state = find_nearest_state(current_state, state_space)
-            action = select_action(Q, nearest_state, epsilon)
+            # nearest_state = find_nearest_state(current_state, state_space)
+            action = select_action(Q, current_state, epsilon)
             next_state = transition(action)
             
             if not was_transition_succefull:
@@ -353,12 +353,12 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
                 total_Rmax_violations += 1
                 print(f'Log: Rmax violation occured: Response time: {performance_penalty:.2f}s, Rmax: {Rmax}s, Total number of Violations: {Rmax_violation_count}')
 
-            current_state_idx = state_space.index(nearest_state)
-            next_state_idx = state_space.index(find_nearest_state(next_state, state_space))
+            # current_state_idx = state_space.index(nearest_state)
+            # next_state_idx = state_space.index(find_nearest_state(next_state, state_space))
             
-            Q[current_state_idx, action_space.index(action)] = (
-                (1 - alpha) * Q[current_state_idx, action_space.index(action)] +
-                alpha * (cost + gamma * min(Q[next_state_idx, :]))
+            Q[current_state, action_space.index(action)] = (
+                (1 - alpha) * Q[current_state, action_space.index(action)] +
+                alpha * (cost + gamma * min(Q[next_state, :]))
             )
             
             # Calculate ETA for the episode
