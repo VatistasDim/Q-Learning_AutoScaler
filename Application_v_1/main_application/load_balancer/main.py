@@ -166,45 +166,60 @@ def get_node_resources(node_id):
 
 def set_cpu_shares(service_name, cpu_shares):
     client = docker.from_env()
-    try:
-        print("Log: Setting CPU shares")
-        service = client.services.get(service_name)
-        service_tasks = service.tasks()
-        
-        if not service_tasks:
-            print("Error: No tasks found for the service")
-            return
-        
-        node_id = service_tasks[0]['NodeID']
-        node_nano_cpus, node_memory_bytes = get_node_resources(node_id)
-        
-        if node_nano_cpus is None or node_memory_bytes is None:
-            print("Error: Could not get node resources")
-            return
-        
-        print(f'Log: Node Nano CPUs: {node_nano_cpus}, Node Memory Bytes: {node_memory_bytes}')
-        
-        resources = service.attrs['Spec']['TaskTemplate']['Resources']
-        if 'Limits' not in resources:
-            resources['Limits'] = {}
-        
-        current_cpu_shares = resources['Limits'].get('NanoCPUs', 0)
-        print(f'Log: Current CPU Shares: {current_cpu_shares} NanoCPUs')
-        
-        desired_cpu_shares_nano = int(cpu_shares * 1_000_000_000)
-        print(f'Log: Desired CPU Shares: {desired_cpu_shares_nano} NanoCPUs')
-        
-        if desired_cpu_shares_nano > node_nano_cpus:
-            print("Error: Not enough CPU resources available")
-            return
-        
-        resources['Limits']['NanoCPUs'] = desired_cpu_shares_nano
-        service.update(resources=resources)
-        print(f"Log: CPU shares set to {desired_cpu_shares_nano} NanoCPUs for service {service_name}")
-        time.sleep(15)
-    except docker.errors.NotFound:
-        print("Error: Cannot Increase CPU Shares")
-        pass
+    retry_attempts = 5
+    for attempt in range(retry_attempts):
+        try:
+            print("Log: Setting CPU shares")
+            service = client.services.get(service_name)
+            service_tasks = service.tasks()
+
+            if not service_tasks:
+                print("Error: No tasks found for the service")
+                return
+
+            node_id = service_tasks[0]['NodeID']
+            node_nano_cpus, node_memory_bytes = get_node_resources(node_id)
+
+            if node_nano_cpus is None or node_memory_bytes is None:
+                print("Error: Could not get node resources")
+                return
+
+            print(f'Log: Node Nano CPUs: {node_nano_cpus}, Node Memory Bytes: {node_memory_bytes}')
+
+            resources = service.attrs['Spec']['TaskTemplate']['Resources']
+            if 'Limits' not in resources:
+                resources['Limits'] = {}
+
+            current_cpu_shares = resources['Limits'].get('NanoCPUs', 0)
+            print(f'Log: Current CPU Shares: {current_cpu_shares} NanoCPUs')
+
+            desired_cpu_shares_nano = int(cpu_shares * 1_000_000_000)
+            print(f'Log: Desired CPU Shares: {desired_cpu_shares_nano} NanoCPUs')
+
+            if desired_cpu_shares_nano > node_nano_cpus:
+                print("Error: Not enough CPU resources available")
+                return
+
+            resources['Limits']['NanoCPUs'] = desired_cpu_shares_nano
+            service.update(resources=resources)
+            print(f"Log: CPU shares set to {desired_cpu_shares_nano} NanoCPUs for service {service_name}")
+            time.sleep(15)
+            break  # Exit the loop if successful
+        except KeyError as e:
+            if 'NodeID' in str(e):
+                print(f"Warning: 'NodeID' not found in service task on attempt {attempt + 1}. Retrying in 30 seconds...")
+                time.sleep(30)
+            else:
+                print(f"Error: Unexpected KeyError: {e}")
+                break
+        except docker.errors.NotFound:
+            print("Error: Service not found. Cannot increase CPU shares.")
+            break
+        except Exception as e:
+            print(f"Error: An unexpected error occurred: {e}")
+            break
+    else:
+        print("Error: Failed to set CPU shares after multiple attempts.")
 
 def get_current_replica_count(service_prefix):
     client = docker.from_env()
