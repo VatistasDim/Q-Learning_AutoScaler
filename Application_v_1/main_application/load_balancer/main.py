@@ -18,7 +18,7 @@ if not os.path.exists(log_dir):
 
 timezone = pytz.timezone('Europe/Athens')
 Rmax = 0.80 # 800 ms
-seconds_for_next_episode = 120 # Determines the seconds for the next episode to begin. 
+seconds_for_next_episode = 30 # Determines the seconds for the next episode to begin.
 alpha = 0.1
 gamma = 0.99
 epsilon_start = 1.0  # Starting value of epsilon
@@ -342,7 +342,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             a1 = 1 if action in [1, -1] else 0
             a2 = 1 if action in [-512, 512] else 0
             
-            cost = Costs.overall_cost_function(w_adp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty * 1000)
+            cost = Costs.overall_cost_function(w_adp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)
             
             total_cost += cost
             print(f'Log: Cost: {cost}, action: {action}')

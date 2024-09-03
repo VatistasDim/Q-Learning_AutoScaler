@@ -1,8 +1,10 @@
 def is_vertical_scaling(action):
-    return action != -1 and action != 0 and action != 512 and action != -512
+    return action in [-512, 512]
 
 def indicator_resource_performance(a1, a2, k_next_state, u_next_state, c_next_state, Rmax, R):
-    return int(R * (k_next_state + a1) * u_next_state * (c_next_state + a2) > Rmax)
+    performance_metric = R * (k_next_state + a1) * u_next_state * (c_next_state + a2)
+    return int(performance_metric > Rmax)
+
 
 class Costs:
     @staticmethod
