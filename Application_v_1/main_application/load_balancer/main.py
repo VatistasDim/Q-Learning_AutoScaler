@@ -316,7 +316,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         "\n\nBest regards, "
         "\nVatistas Dimitrios"
         "\nSeptember 2024")
-    print("Log: Training Starting ...")
+    print("\nLog: Training Starting ...")
     training_start_time = datetime.now()  # Start time of the entire training
 
     while episode <= num_episodes:
