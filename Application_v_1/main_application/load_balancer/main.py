@@ -285,7 +285,7 @@ def check_horizontal_or_vertical_scaling(action):
     elif action == 1 or action == -1:
         return False, True
     else:
-        False, False
+        return False, False
 
 def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     episode = 1
