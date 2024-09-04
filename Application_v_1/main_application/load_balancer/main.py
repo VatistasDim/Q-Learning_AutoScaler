@@ -310,7 +310,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     # Epsilon parameters
     epsilon = epsilon_start  # Start with the initial epsilon value
 
-    print(f"GREETING: The run is expected to take approximately {(num_episodes * seconds_for_next_episode) / 60:.2f} minutes to complete. "
+    print(f"\n\nGREETING: The run is expected to take approximately {(num_episodes * seconds_for_next_episode) / 60:.2f} minutes to complete. "
         "During this time, you may encounter some errors in the logs, but don't worry—the code is designed to handle them. "
         "\n\nThank you! Enjoy the process! 😊"
         "\n\nBest regards, "
