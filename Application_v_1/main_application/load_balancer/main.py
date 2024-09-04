@@ -368,7 +368,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             total_containers += current_state[2]
             steps += 1
             
-            is_vertical_scale, is_horizontal_scale,  = check_horizontal_or_vertical_scaling(action)
+            is_vertical_scale, is_horizontal_scale = check_horizontal_or_vertical_scaling(action)
             
             if is_horizontal_scale:
                 horizontal_scaling_count += 1
