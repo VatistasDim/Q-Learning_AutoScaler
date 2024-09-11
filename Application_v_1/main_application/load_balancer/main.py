@@ -402,9 +402,11 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             if is_horizontal_scale:
                 horizontal_scaling_count += 1
-            
+                print(f'Horizontal scaling occurred: {horizontal_scaling_count}')
+
             if is_vertical_scale:
                 vertical_scaling_count += 1
+                print(f'Vertical scaling occurred: {vertical_scaling_count}')
             
             total_actions += 1
             print(f'Log: Response time: {performance_penalty:.2f}s')
@@ -443,6 +445,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             print(f"Log: Episode: {episode}, ETA for current episode: {eta_episode_athens}, \nLog: ETA for all episodes: {eta_all_episodes_athens}")
             print(f'Log: Average response time of current episode: {total_response_time / steps:.2f}')
             print(f'Log: Average response time for all episodes so far: {total_response_time / steps:.2f}')
+            print(f"Log: Action: {action}, Horizontal scaling: {is_horizontal_scale}, Vertical scaling: {is_vertical_scale}")
             
             if elapsed_time_episode > seconds_for_next_episode or steps >= 1000:
                 break
@@ -659,7 +662,7 @@ if __name__ == '__main__':
     
     reset_environment_to_initial_state()
     
-    num_episodes = 1
+    num_episodes = 3
 
     baseline = True
     
