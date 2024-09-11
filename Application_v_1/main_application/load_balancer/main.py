@@ -328,7 +328,8 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     avarage_vertical_scale = []
     average_cpu_utilization = []
     average_cost_per_episode = []
-    avarage_horizontal_scale = []
+    avarage_vertical_scale_per_episode = []
+    avarage_horizontal_scale_per_episode = []
     avarage_containers_per_episode = []
     average_rmax_violations_per_episode = []
     average_cpu_utilization_per_episode = []
@@ -471,6 +472,12 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             rmax_violation_percentage_for_episode = (Rmax_violation_count / steps) * 100
             average_rmax_violations_per_episode.append(rmax_violation_percentage_for_episode)
             
+            avarage_horizontal_scale_for_episode = (horizontal_scaling_count / steps) * 100
+            avarage_horizontal_scale_per_episode.append(avarage_horizontal_scale_for_episode)
+            
+            vertical_scaling_for_episode = (vertical_scaling_count / steps) * 100
+            avarage_vertical_scale_per_episode.append(vertical_scaling_for_episode)
+            
             # Calculate the avarage contaners
             avarage_containers_for_episode = (total_containers / steps)
             avarage_containers_per_episode.append(avarage_containers_for_episode)
@@ -497,8 +504,8 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     final_avarage_containers = sum(avarage_containers_per_episode) / len(avarage_containers_per_episode)
     avarage_response_time = (total_response_time / total_actions)
     average_cpu_shares_new = (total_cpu_shares / total_actions)
-    average_horizontal_scaling_final = sum(avarage_horizontal_scale) / len(avarage_horizontal_scale)
-    avarage_vertical_scale_final = sum(avarage_vertical_scale) / len(avarage_vertical_scale)
+    average_horizontal_scaling_final = sum(avarage_horizontal_scale_per_episode) / len(avarage_horizontal_scale_per_episode)
+    avarage_vertical_scale_final = sum(avarage_vertical_scale_per_episode) / len(avarage_vertical_scale_per_episode)
 
     return (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
             average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time,
