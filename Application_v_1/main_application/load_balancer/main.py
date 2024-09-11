@@ -494,8 +494,8 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     final_avarage_containers = sum(avarage_containers_per_episode) / len(avarage_containers_per_episode)
     avarage_response_time = (total_response_time / total_actions)
     average_cpu_shares_new = (total_cpu_shares / total_actions)
-    average_horizontal_scaling_final = (sum(avarage_horizontal_scale) / total_actions) * 100
-    avarage_vertical_scale_final = (sum(avarage_vertical_scale) / total_actions) * 100
+    average_horizontal_scaling_final = sum(avarage_horizontal_scale) / len(avarage_horizontal_scale)
+    avarage_vertical_scale_final = sum(avarage_vertical_scale) / len(avarage_vertical_scale)
 
     return (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
             average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time,
@@ -659,7 +659,7 @@ if __name__ == '__main__':
     
     reset_environment_to_initial_state()
     
-    num_episodes = 120
+    num_episodes = 1
 
     baseline = True
     
