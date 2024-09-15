@@ -648,7 +648,7 @@ def create_plots(run_number, iterations):
 
 def gather_learning_metrics_and_save(run_number, q, num_episodes, w_perf, w_res, w_adp, Rmax, rmax_violations_percantage, 
                                      cpu_utilization_percentage, average_cpu_shares_new, containers_percentage, 
-                                     avarage_response_time_new, average_horizontal_scaling_final = 0, avarage_vertical_scale_final = 0):
+                                     avarage_response_time_new, average_horizontal_scaling_final, avarage_vertical_scale_final):
     q_learning_log_path = f'/logs/q-learning-final-log_{run_number}.txt'
     q_learning_values_path = f'/logs/q-values_{run_number}.npy'
     q_learning_statistics = (
@@ -697,7 +697,15 @@ if __name__ == '__main__':
         running_time = num_episodes * seconds_for_next_episode / 60
         
         create_plots(run_number="First", iterations=iterations)
-        gather_learning_metrics_and_save("First", q, running_time, w_perf, w_res, w_adp, Rmax, rmax_violations_percantage, cpu_utilization_percentage, average_cpu_shares_new, containers_percentage, avarage_response_time_new)
+        gather_learning_metrics_and_save("First", 
+                                         q, 
+                                         running_time, 
+                                         w_perf, 
+                                         w_res, 
+                                         w_adp, Rmax, rmax_violations_percantage, 
+                                         cpu_utilization_percentage, average_cpu_shares_new, 
+                                         containers_percentage, avarage_response_time_new, 
+                                         average_horizontal_scaling_final, avarage_vertical_scale_final)
 
     reset_environment_to_initial_state()
     
@@ -715,7 +723,15 @@ if __name__ == '__main__':
         iterations = range(1, num_iterations + 1)
 
         create_plots(run_number="Second", iterations=iterations)
-        gather_learning_metrics_and_save("Second", q, num_episodes, w_perf, w_res, w_adp, Rmax, rmax_violations_percantage, cpu_utilization_percentage, average_cpu_shares_new, containers_percentage, avarage_response_time_new)
+        gather_learning_metrics_and_save("First", 
+                                         q, 
+                                         running_time, 
+                                         w_perf, 
+                                         w_res, 
+                                         w_adp, Rmax, rmax_violations_percantage, 
+                                         cpu_utilization_percentage, average_cpu_shares_new, 
+                                         containers_percentage, avarage_response_time_new, 
+                                         average_horizontal_scaling_final, avarage_vertical_scale_final)
 
     reset_environment_to_initial_state()
 
@@ -733,7 +749,15 @@ if __name__ == '__main__':
         iterations = range(1, num_iterations + 1)
 
         create_plots(run_number="Third", iterations=iterations)
-        gather_learning_metrics_and_save("Third", q, num_episodes, w_perf, w_res, w_adp, Rmax, rmax_violations_percantage, cpu_utilization_percentage, average_cpu_shares_new, containers_percentage, avarage_response_time_new)
+        gather_learning_metrics_and_save("First", 
+                                         q, 
+                                         running_time, 
+                                         w_perf, 
+                                         w_res, 
+                                         w_adp, Rmax, rmax_violations_percantage, 
+                                         cpu_utilization_percentage, average_cpu_shares_new, 
+                                         containers_percentage, avarage_response_time_new, 
+                                         average_horizontal_scaling_final, avarage_vertical_scale_final)
 
     reset_environment_to_initial_state()
     
