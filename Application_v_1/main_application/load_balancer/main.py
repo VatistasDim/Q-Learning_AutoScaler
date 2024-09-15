@@ -669,7 +669,7 @@ if __name__ == '__main__':
     
     reset_environment_to_initial_state()
     
-    num_episodes = 3
+    num_episodes = 1
 
     baseline = True
     
@@ -706,7 +706,8 @@ if __name__ == '__main__':
 
         (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
         average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time,
-        w_adp, w_perf, w_res, rmax_violations_percantage, cpu_utilization_percentage, containers_percentage, avarage_response_time_new, average_cpu_shares_new, q) = q_learning_metrics
+        w_adp, w_perf, w_res, rmax_violations_percantage, cpu_utilization_percentage, containers_percentage, avarage_response_time_new, average_cpu_shares_new,
+        average_horizontal_scaling_final, avarage_vertical_scale_final, avarage_horizontal_scale, avarage_vertical_scale, q) = q_learning_metrics
 
         num_iterations = len(costs_per_episode)
         iterations = range(1, num_iterations + 1)
@@ -723,7 +724,8 @@ if __name__ == '__main__':
 
         (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
         average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time,
-        w_adp, w_perf, w_res, rmax_violations_percantage, cpu_utilization_percentage, containers_percentage, avarage_response_time_new, average_cpu_shares_new, q) = q_learning_metrics
+        w_adp, w_perf, w_res, rmax_violations_percantage, cpu_utilization_percentage, containers_percentage, avarage_response_time_new, average_cpu_shares_new,
+        average_horizontal_scaling_final, avarage_vertical_scale_final, avarage_horizontal_scale, avarage_vertical_scale, q) = q_learning_metrics
 
         num_iterations = len(costs_per_episode)
         iterations = range(1, num_iterations + 1)
