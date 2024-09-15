@@ -671,7 +671,7 @@ if __name__ == '__main__':
     
     reset_environment_to_initial_state()
     
-    num_episodes = 1
+    num_episodes = 120
 
     baseline = True
     
