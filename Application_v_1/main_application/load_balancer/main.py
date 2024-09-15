@@ -328,6 +328,8 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     avarage_vertical_scale = []
     average_cpu_utilization = []
     average_cost_per_episode = []
+    avarage_horizontal_scale = []
+    avarage_vertical_scale = []
     avarage_vertical_scale_per_episode = []
     avarage_horizontal_scale_per_episode = []
     avarage_containers_per_episode = []
