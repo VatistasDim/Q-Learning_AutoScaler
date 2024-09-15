@@ -474,10 +474,10 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             rmax_violation_percentage_for_episode = (Rmax_violation_count / steps) * 100
             average_rmax_violations_per_episode.append(rmax_violation_percentage_for_episode)
             
-            avarage_horizontal_scale_for_episode = (horizontal_scaling_count / steps) * 100
+            avarage_horizontal_scale_for_episode = (horizontal_scaling_count / steps)
             avarage_horizontal_scale_per_episode.append(avarage_horizontal_scale_for_episode)
             
-            vertical_scaling_for_episode = (vertical_scaling_count / steps) * 100
+            vertical_scaling_for_episode = (vertical_scaling_count / steps)
             avarage_vertical_scale_per_episode.append(vertical_scaling_for_episode)
             
             # Calculate the avarage contaners
