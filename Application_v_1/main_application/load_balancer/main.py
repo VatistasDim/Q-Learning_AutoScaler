@@ -681,10 +681,7 @@ if __name__ == '__main__':
     print("Log: Generated weights:")
     
     for i in range(length):
-        print(f"Log: Row {i + 1}:")
-        print(f"  Log: Performance weight (w_perf): {w_perf[i]:.2f}")
-        print(f"  Log: Adaptation weight (w_adp): {w_adp[i]:.2f}")
-        print(f"  Log: Resource weight (w_res): {w_res[i]:.2f}")
+        print(f"Log: (w_perf): {w_perf[i]:.2f}, (w_adp): {w_adp[i]:.2f}, (w_res): {w_res[i]:.2f}")
     
     for i in range(length):
         
