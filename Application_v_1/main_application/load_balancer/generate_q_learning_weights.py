@@ -38,12 +38,10 @@ def create_file_with_random_weights(file_path, num_rows=20):
     if not os.path.exists(directory):
         os.makedirs(directory)
     
-    # Lists to store the generated weights
     w_perf = []
     w_adp = []
     w_res = []
 
-    # Open the file and write random weights to it
     with open(file_path, "w") as file:
         for _ in range(num_rows):
             perf = random.uniform(0, 1)
@@ -53,8 +51,7 @@ def create_file_with_random_weights(file_path, num_rows=20):
             w_perf.append(perf)
             w_adp.append(adp)
             w_res.append(res)
-
-            # Write the formatted row to the file
+            
             row = f"{perf:.2f},{adp:.2f},{res:.2f}"
             file.write(row + "\n")
 
