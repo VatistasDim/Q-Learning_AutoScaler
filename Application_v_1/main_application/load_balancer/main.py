@@ -674,27 +674,27 @@ if __name__ == '__main__':
     
     check_and_delete_file(file_path)
     
-    weights = create_file_with_random_weights(file_path, num_rows=20)
+    w_perf, w_adp, w_res = create_file_with_random_weights(file_path, num_rows=20)    
     
-    print("Generated weights:", weights)
-
-    reset_environment_to_initial_state()
+    length = len(w_perf)
     
-    num_episodes = 120
-
-    baseline = True
+    print("Log: Generated weights:")
     
-    run_first = True
+    for i in range(length):
+        print(f"Log: Row {i + 1}:")
+        print(f"  Log: Performance weight (w_perf): {w_perf[i]:.2f}")
+        print(f"  Log: Adaptation weight (w_adp): {w_adp[i]:.2f}")
+        print(f"  Log: Resource weight (w_res): {w_res[i]:.2f}")
     
-    run_second = True    
-  
-    run_third = True
-    
-    if run_first:
+    for i in range(length):
+        
+        reset_environment_to_initial_state()
+        
+        num_episodes = 120
         
         # Initialize Q-table
         Q = np.zeros((len(state_space), len(action_space)))
-        q_learning_metrics = run_q_learning(num_episodes, w_perf=0.90, w_adp=0.01, w_res=0.09)
+        q_learning_metrics = run_q_learning(num_episodes, w_perf[i], w_adp[i], w_res[i])
         
         (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
         average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time,
@@ -705,68 +705,16 @@ if __name__ == '__main__':
         iterations = range(1, num_iterations + 1)
         running_time = num_episodes * seconds_for_next_episode / 60
         
-        create_plots(run_number="First", iterations=iterations)
-        gather_learning_metrics_and_save("First", 
-                                         q, 
-                                         running_time, 
-                                         w_perf, 
-                                         w_res, 
-                                         w_adp, Rmax, rmax_violations_percantage, 
-                                         cpu_utilization_percentage, average_cpu_shares_new, 
-                                         containers_percentage, avarage_response_time_new, 
-                                         average_horizontal_scaling_final, avarage_vertical_scale_final)
-
-    reset_environment_to_initial_state()
-    
-    if run_second:
-        # Initialize Q-table
-        Q = np.zeros((len(state_space), len(action_space)))
-        q_learning_metrics = run_q_learning(num_episodes, w_perf=0.09, w_adp=0.01, w_res=0.90)
-
-        (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
-        average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time,
-        w_adp, w_perf, w_res, rmax_violations_percantage, cpu_utilization_percentage, containers_percentage, avarage_response_time_new, average_cpu_shares_new,
-        average_horizontal_scaling_final, avarage_vertical_scale_final, avarage_horizontal_scale, avarage_vertical_scale, q) = q_learning_metrics
-
-        num_iterations = len(costs_per_episode)
-        iterations = range(1, num_iterations + 1)
-
-        create_plots(run_number="Second", iterations=iterations)
-        gather_learning_metrics_and_save("Second", 
-                                         q, 
-                                         running_time, 
-                                         w_perf, 
-                                         w_res, 
-                                         w_adp, Rmax, rmax_violations_percantage, 
-                                         cpu_utilization_percentage, average_cpu_shares_new, 
-                                         containers_percentage, avarage_response_time_new, 
-                                         average_horizontal_scaling_final, avarage_vertical_scale_final)
-
-    reset_environment_to_initial_state()
-
-    if run_third:
-        # Initialize Q-table
-        Q = np.zeros((len(state_space), len(action_space)))
-        q_learning_metrics = run_q_learning(num_episodes, w_perf=0.33, w_adp=0.33, w_res=0.33)
-
-        (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
-        average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time,
-        w_adp, w_perf, w_res, rmax_violations_percantage, cpu_utilization_percentage, containers_percentage, avarage_response_time_new, average_cpu_shares_new,
-        average_horizontal_scaling_final, avarage_vertical_scale_final, avarage_horizontal_scale, avarage_vertical_scale, q) = q_learning_metrics
-
-        num_iterations = len(costs_per_episode)
-        iterations = range(1, num_iterations + 1)
-
-        create_plots(run_number="Third", iterations=iterations)
-        gather_learning_metrics_and_save("Third", 
-                                         q, 
-                                         running_time, 
-                                         w_perf, 
-                                         w_res, 
-                                         w_adp, Rmax, rmax_violations_percantage, 
-                                         cpu_utilization_percentage, average_cpu_shares_new, 
-                                         containers_percentage, avarage_response_time_new, 
-                                         average_horizontal_scaling_final, avarage_vertical_scale_final)
+        create_plots(run_number= i, iterations=iterations)
+        gather_learning_metrics_and_save(i, 
+                                        q, 
+                                        running_time, 
+                                        w_perf, 
+                                        w_res, 
+                                        w_adp, Rmax, rmax_violations_percantage, 
+                                        cpu_utilization_percentage, average_cpu_shares_new, 
+                                        containers_percentage, avarage_response_time_new, 
+                                        average_horizontal_scaling_final, avarage_vertical_scale_final)
 
     reset_environment_to_initial_state()
     
