@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from docker_api import DockerAPI
 from costs import Costs
+from generate_q_learning_weights import check_and_delete_file, create_file_with_random_weights
 import docker
 import pytz, os
 import itertools
@@ -669,6 +670,14 @@ def gather_learning_metrics_and_save(run_number, q, num_episodes, w_perf, w_res,
     
 if __name__ == '__main__':
     
+    file_path = 'load_balancer/Weights/q_learning_weights.txt'
+    
+    check_and_delete_file(file_path)
+    
+    weights = create_file_with_random_weights(file_path, num_rows=20)
+    
+    print("Generated weights:", weights)
+
     reset_environment_to_initial_state()
     
     num_episodes = 120
@@ -723,7 +732,7 @@ if __name__ == '__main__':
         iterations = range(1, num_iterations + 1)
 
         create_plots(run_number="Second", iterations=iterations)
-        gather_learning_metrics_and_save("First", 
+        gather_learning_metrics_and_save("Second", 
                                          q, 
                                          running_time, 
                                          w_perf, 
@@ -749,7 +758,7 @@ if __name__ == '__main__':
         iterations = range(1, num_iterations + 1)
 
         create_plots(run_number="Third", iterations=iterations)
-        gather_learning_metrics_and_save("First", 
+        gather_learning_metrics_and_save("Third", 
                                          q, 
                                          running_time, 
                                          w_perf, 
