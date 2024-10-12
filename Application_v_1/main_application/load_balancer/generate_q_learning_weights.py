@@ -33,7 +33,6 @@ def create_file_with_random_weights(file_path, num_rows=20):
                - w_adp: List of adaptation weights
                - w_res: List of resource weights
     """
-    # Create the directory if it doesn't exist
     directory = os.path.dirname(file_path)
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -57,7 +56,3 @@ def create_file_with_random_weights(file_path, num_rows=20):
 
     print(f"File '{file_path}' has been created with random weights.")
     return w_perf, w_adp, w_res
-
-# file_path = 'load_balancer/Weights/q_learning_weights.txt'
-# weights = create_file_with_random_weights(file_path, num_rows=20)
-# print("Generated weights:", weights)
