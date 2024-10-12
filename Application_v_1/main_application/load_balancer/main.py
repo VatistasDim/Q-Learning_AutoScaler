@@ -687,7 +687,7 @@ if __name__ == '__main__':
         
         reset_environment_to_initial_state()
         
-        num_episodes = 120
+        num_episodes = 80
         
         # Initialize Q-table
         Q = np.zeros((len(state_space), len(action_space)))
