@@ -1,0 +1,15 @@
+num_episodes = 80; 
+seconds_for_next_episode; 
+alpha = 0.1; 
+gamma = 0.99; 
+wait_time = 10; 
+Rmax = 0.80; 
+baseline = True;
+max_replicas = 10;
+min_replicas = 1;
+max_containers = 11;
+epsilon_start = 1.0;
+epsilon_end = 0.1;
+epsilon_decay = 0.98;
+url = 'http://prometheus:9090/api/v1/query';
+service_name = 'mystack_application';

@@ -1,14 +1,12 @@
 import numpy as np
-import time
 import prometheus_metrics
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from docker_api import DockerAPI
 from costs import Costs
 from generate_q_learning_weights import check_and_delete_file, create_file_with_random_weights
-import docker
-import pytz, os
-import itertools
+from settings import load_settings
+import pytz, os, itertools, docker, time
 
 if not os.path.exists('/app/plots'):
     os.makedirs('/app/plots')
@@ -17,24 +15,40 @@ log_dir = '/app/logs'
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)   
 
+settings_file = 'load_balancer/ApplicationSettings/applicationSettings.txt'
+settings = load_settings(settings_file)
 timezone = pytz.timezone('Europe/Athens')
-Rmax = 0.80 # 800 ms
-seconds_for_next_episode = 60 # Determines the seconds for the next episode to begin.
-alpha = 0.1
-gamma = 0.99
-epsilon_start = 1.0  # Starting value of epsilon
-epsilon_end = 0.1    # Minimum value of epsilon
-epsilon_decay = 0.98  # Decay factor per episode
+Rmax = settings.get('Rmax', 0.80)
+seconds_for_next_episode = settings.get('seconds_for_next_episode', 60)
+alpha = settings.get('alpha', 0.1)
+gamma = settings.get('gamma', 0.99)
+epsilon_start = settings.get('epsilon_start', 1.0)
+epsilon_end = settings.get('epsilon_end', 0.1)
+epsilon_decay = settings.get('epsilon_decay', 0.98)
 cres = 0.01
-wait_time = 15
-url = 'http://prometheus:9090/api/v1/query'
-service_name = 'mystack_application'
-application_url = 'http://application:8501/train'
-max_replicas = 10
-min_replicas = 1
-w_perf = 0.5 
-w_res = 0.4
-max_containers = 11
+wait_time = settings.get('wait_time', 15)
+baseline = settings.get('baseline', True)
+url = settings.get('url', 'http://prometheus:9090/api/v1/query')
+service_name = settings.get('service_name', 'mystack_application')
+max_replicas = settings.get('max_replicas', 10)
+min_replicas = settings.get('min_replicas', 1)
+max_containers = settings.get('max_containers', 11)
+
+print(f'Rmax: {Rmax}')
+print(f'seconds_for_next_episode: {seconds_for_next_episode}')
+print(f'alpha: {alpha}')
+print(f'gamma: {gamma}')
+print(f'epsilon_start: {epsilon_start}')
+print(f'epsilon_end: {epsilon_end}')
+print(f'epsilon_decay: {epsilon_decay}')
+print(f'wait_time: {wait_time}')
+print(f'baseline: {baseline}')
+print(f'url: {url}')
+print(f'service_name: {service_name}')
+print(f'max_replicas: {max_replicas}')
+print(f'min_replicas: {min_replicas}')
+print(f'max_containers: {max_containers}')
+
 
 # Define the ranges for CPU utilization, number of running containers, and CPU shares
 cpu_utilization_values = range(101)  # CPU utilization values from 0 to 100
