@@ -17,7 +17,7 @@ def check_and_delete_file(file_path):
 
 def create_file_with_random_weights(file_path, num_rows=20):
     """
-    Create a file at the specified path and generate random weights.
+    Create a .txt file at the specified path and generate random weights.
     Each weight is a float value between 0 and 1, and three weights are 
     generated per row. The weights are stored in three separate lists 
     which are returned as a tuple.
@@ -36,7 +36,7 @@ def create_file_with_random_weights(file_path, num_rows=20):
     directory = os.path.dirname(file_path)
     if not os.path.exists(directory):
         os.makedirs(directory)
-    
+
     w_perf = []
     w_adp = []
     w_res = []
