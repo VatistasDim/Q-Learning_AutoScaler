@@ -15,7 +15,7 @@ log_dir = '/app/logs'
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)   
 
-settings_file = 'load_balancer/ApplicationSettings/applicationSettings.txt'
+settings_file = 'ApplicationSettings/applicationSettings.txt'
 settings = load_settings(settings_file)
 timezone = pytz.timezone('Europe/Athens')
 Rmax = settings.get('Rmax', 0.80)
