@@ -688,14 +688,14 @@ if __name__ == '__main__':
     
     check_and_delete_file(file_path)
     
-    w_perf, w_adp, w_res = create_file_with_random_weights(file_path, num_rows=20)    
+    w_perf_list, w_adp_list, w_res_list = create_file_with_random_weights(file_path, num_rows=20)    
     
     length = len(w_perf)
     
     print("Log: Generated weights:")
     
     for i in range(length):
-        print(f"Log: (w_perf): {w_perf[i]:.2f}, (w_adp): {w_adp[i]:.2f}, (w_res): {w_res[i]:.2f}")
+        print(f"Log: (w_perf): {w_perf_list[i]:.2f}, (w_adp): {w_adp_list[i]:.2f}, (w_res): {w_res_list[i]:.2f}")
     
     for i in range(length):
         
@@ -705,7 +705,7 @@ if __name__ == '__main__':
         
         # Initialize Q-table
         Q = np.zeros((len(state_space), len(action_space)))
-        q_learning_metrics = run_q_learning(num_episodes, w_perf[i], w_adp[i], w_res[i])
+        q_learning_metrics = run_q_learning(num_episodes, w_perf_list[i], w_adp_list[i], w_res_list[i])
         
         (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
         average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time,
