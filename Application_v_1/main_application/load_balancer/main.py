@@ -14,8 +14,9 @@ if not os.path.exists('/app/plots'):
 log_dir = '/app/logs'
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)   
+client = docker.DockerClient(base_url='unix://var/run/docker.sock')
 
-settings_file = 'ApplicationSettings/applicationSettings.txt'
+settings_file = 'ApplicationSettings/ApplicationSettings.txt'
 settings = load_settings(settings_file)
 timezone = pytz.timezone('Europe/Athens')
 Rmax = settings.get('Rmax', 0.80)
@@ -690,7 +691,7 @@ if __name__ == '__main__':
     
     w_perf_list, w_adp_list, w_res_list = create_file_with_random_weights(file_path, num_rows=20)    
     
-    length = len(w_perf)
+    length = len(w_perf_list)
     
     print("Log: Generated weights:")
     
@@ -701,12 +702,11 @@ if __name__ == '__main__':
         
         reset_environment_to_initial_state()
         
-        num_episodes = 80
+        num_episodes = 1
         
         # Initialize Q-table
         Q = np.zeros((len(state_space), len(action_space)))
-        q_learning_metrics = run_q_learning(num_episodes, w_perf_list[i], w_adp_list[i], w_res_list[i])
-        
+        q_learning_metrics = run_q_learning(num_episodes, w_perf_list[i], w_adp_list[i], w_res_list[i])     
         (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
         average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time,
         w_adp, w_perf, w_res, rmax_violations_percantage, cpu_utilization_percentage, containers_percentage, avarage_response_time_new, average_cpu_shares_new,
