@@ -685,7 +685,7 @@ def gather_learning_metrics_and_save(run_number, q, num_episodes, w_perf, w_res,
     
 if __name__ == '__main__':
     
-    file_path = 'load_balancer/Weights/q_learning_weights.txt'
+    file_path = 'GeneratedWeights/q_learning_weights.txt'
     
     check_and_delete_file(file_path)
     

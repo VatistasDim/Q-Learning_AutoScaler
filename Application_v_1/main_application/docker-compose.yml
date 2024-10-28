@@ -63,6 +63,7 @@ services:
       - ~/vatistas/plots:/app/plots
       - ~/vatistas/QSavedWeights:/QSavedWeights
       - ~/vatistas/logs:/logs
+      - ~/vatistas/Generated_Weights:/app/Generated_Weights
       - /var/run/docker.sock:/var/run/docker.sock
     deploy:
       restart_policy:
