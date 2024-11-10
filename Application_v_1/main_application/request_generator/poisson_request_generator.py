@@ -18,7 +18,7 @@ def send_request():
         # Calculate the time taken for the request
         response_time = time.time() - start_time
         
-        print(f"Status: {response.status_code}, Response: {response.text}, Time taken: {response_time:.2f} seconds")
+        print(f"Status: {response.status_code}, Time taken: {response_time:.2f} seconds")
     
     except requests.RequestException as e:
         print(f"Request failed: {e}")
