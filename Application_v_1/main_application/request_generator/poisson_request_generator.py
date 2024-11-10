@@ -1,21 +1,31 @@
 import numpy as np
 import time
 import requests
+import os
 
-# Define the endpoint and Poisson rate (λ)
-ENDPOINT = "http://your-server-endpoint/api"
-LAMBDA = 5  # Average requests per minute (adjust as needed)
+# Endpoint and request rate setup
+ENDPOINT = os.getenv("ENDPOINT", "http://195.251.56.82:8080/json_endpoint")
+LAMBDA = int(os.getenv("LAMBDA", 5))  # Average requests per minute
 
 def send_request():
     try:
+        # Record the start time
+        start_time = time.time()
+        
+        # Send the request
         response = requests.get(ENDPOINT)
-        print(f"Status: {response.status_code}, Response: {response.text}")
+        
+        # Calculate the time taken for the request
+        response_time = time.time() - start_time
+        
+        print(f"Status: {response.status_code}, Response: {response.text}, Time taken: {response_time:.2f} seconds")
+    
     except requests.RequestException as e:
         print(f"Request failed: {e}")
 
 def generate_poisson_requests(rate):
     while True:
-        # Wait for a random interval based on Poisson distribution
+        # Generate the interval based on Poisson distribution
         interval = np.random.poisson(rate)
         time.sleep(interval / 60)  # Convert interval to minutes
         send_request()
