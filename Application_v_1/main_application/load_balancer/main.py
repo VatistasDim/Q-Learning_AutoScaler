@@ -332,203 +332,150 @@ def check_horizontal_or_vertical_scaling(action):
     else:
         return False, False
 
-def run_q_learning(num_episodes, w_perf, w_adp, w_res):
+def print_training_start_message(num_episodes):
+    print(f"Starting Q-learning training for {num_episodes} episodes...")
     
-    episode = 1
-    Rmax_violations = []
-    costs_per_episode = []
-    average_cpu_shares = []
-    average_response_time = []
-    average_num_containers = []
-    total_time_per_episode = []
-    avarage_vertical_scale = []
-    average_cpu_utilization = []
-    average_cost_per_episode = []
-    avarage_horizontal_scale = []
-    avarage_vertical_scale = []
-    avarage_vertical_scale_per_episode = []
-    avarage_horizontal_scale_per_episode = []
-    avarage_containers_per_episode = []
-    average_rmax_violations_per_episode = []
-    average_cpu_utilization_per_episode = []
-    
-    total_actions = 0
-    total_cpu_shares = 0
-    total_response_time = 0
-    vertical_scaling_count = 0
-    horizontal_scaling_count = 0
+def log_episode_progress(episode, episode_start_time, training_start_time, steps, metrics):
+    elapsed_time = (datetime.now() - training_start_time).total_seconds()
+    episode_duration = (datetime.now() - episode_start_time).total_seconds()
+    print(f"Episode {episode} completed in {episode_duration:.2f} seconds.")
+    print(f"Total training time elapsed: {elapsed_time:.2f} seconds.")
 
-    # Epsilon parameters
+    if episode > 1 and 'average_cost_per_episode' in metrics:
+        window_size = max(1, min(10, episode // 10))
+        recent_costs = metrics['average_cost_per_episode'][-window_size:] if len(metrics['average_cost_per_episode']) >= window_size else metrics['average_cost_per_episode']
+        if len(recent_costs) > 1 and recent_costs[-1] < np.mean(recent_costs[:-1]):
+            print("Log: Algorithm appears to be learning, as costs are decreasing.")
+        else:
+            print("Log: Algorithm may not be learning effectively, as costs are not decreasing.")
+
+def run_q_learning(num_episodes, w_perf, w_adp, w_res):
+    episode = 1
+    metrics = initialize_metrics()
+    total_actions, total_cpu_shares, total_response_time = 0, 0, 0
+    vertical_scaling_count, horizontal_scaling_count = 0, 0
     epsilon = epsilon_start  # Start with the initial epsilon value
 
-    print(f"\n\nGREETING: The run is expected to take approximately {(num_episodes * seconds_for_next_episode) / 60:.2f} minutes to complete. "
-        "During this time, you may encounter some errors in the logs, but don't worry—the code is designed to handle them. "
-        "\n\nThank you! Enjoy the process! 😊"
-        "\n\nBest regards, "
-        "\nVatistas Dimitrios"
-        "\nSeptember 2024")
-    print("\nLog: Training Starting ...")
-    training_start_time = datetime.now()  # Start time of the entire training
+    print_training_start_message(num_episodes)
+    training_start_time = datetime.now()
 
     while episode <= num_episodes:
         print(f'Log: Episode: {episode}')
-        app_state = state()
-        total_cpu_utilization = 0
-        total_Rmax_violations = 0
-        total_containers = 0
-        total_cost = 0
-        total_reward = 0
-        steps = 0
-        Rmax_violation_count = 0
-        next_state = app_state
-        episode_start_time = datetime.now()  # Start time of the current episode
+        episode_metrics = initialize_episode_metrics()
+        next_state, steps = state(), 0
+        episode_start_time = datetime.now()
 
-        while True:
-            print("\n")
+        while not should_terminate_episode(episode_start_time, steps):
+            steps += 1
             current_state = next_state
             nearest_state = find_nearest_state(current_state, state_space)
             action = select_action(Q, nearest_state, epsilon)
             next_state = transition(action)
-            
+
             if not was_transition_succefull:
                 print('Log: No action because no transition was made.')
                 action = 0
-                
-            fetched_data = fetch_data()  # Fetch data once per iteration
-            
-            _, _, _, performance_penalty, _ = fetched_data
-            
-            performance_penalty = ensure_performance_penalty_has_data(performance_penalty)
-            print(f'Log: Perfomance Time: {performance_penalty}')
-            total_response_time += performance_penalty
-            print(f'Log: Total response time: {total_response_time}')
-            
-            a1 = 1 if action in [1, -1] else 0
-            a2 = 1 if action in [-512, 512] else 0
-            
-            cost = Costs.overall_cost_function(w_adp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)
-            
-            total_cost += cost
-            print(f'Log: Cost: {cost}, action: {action}')
-            
-            total_reward += cost
-            total_cpu_utilization += current_state[1]
-            total_cpu_shares += current_state[0]
-            total_containers += current_state[2]
-            steps += 1
-            
-            is_vertical_scale, is_horizontal_scale = check_horizontal_or_vertical_scaling(action)
-            
-            if is_horizontal_scale:
-                horizontal_scaling_count += 1
-                print(f'Horizontal scaling occurred: {horizontal_scaling_count}')
 
-            if is_vertical_scale:
-                vertical_scaling_count += 1
-                print(f'Vertical scaling occurred: {vertical_scaling_count}')
-            
-            total_actions += 1
-            print(f'Log: Response time: {performance_penalty:.2f}s')
-            
-            if performance_penalty > Rmax:
-                Rmax_violation_count += 1
-                total_Rmax_violations += 1
-                print(f'Log: Rmax violation occured: Response time: {performance_penalty:.2f}s, Rmax: {Rmax}s, Total number of Violations: {Rmax_violation_count}')
+            fetched_data = fetch_data()
+            performance_penalty = ensure_performance_penalty_has_data(fetched_data[3])
+            cost = compute_cost(w_adp, w_perf, w_res, next_state, action, performance_penalty)
 
-            current_state_idx = state_space.index(nearest_state)
-            next_state_idx = state_space.index(find_nearest_state(next_state, state_space))
-            
-            Q[current_state_idx, action_space.index(action)] = (
-                (1 - alpha) * Q[current_state_idx, action_space.index(action)] +
-                alpha * (cost + gamma * min(Q[next_state_idx, :]))
-            )
-            
-            # Calculate ETA for the episode
-            elapsed_time_episode = (datetime.now() - episode_start_time).total_seconds()
-            average_time_per_step = elapsed_time_episode / steps if steps > 0 else 0
-            remaining_steps = max(0, steps - 1)  # Assuming steps is an integer
-            remaining_time_for_episode = remaining_steps * average_time_per_step
-            eta_for_episode = datetime.now() + timedelta(seconds=remaining_time_for_episode)
+            update_metrics(metrics, episode_metrics, action, performance_penalty, cost, current_state)
+            update_q_table(Q, nearest_state, next_state, action, cost)
+            log_episode_progress(episode, episode_start_time, training_start_time, steps)
 
-            # Calculate ETA for all episodes
-            elapsed_time_total = (datetime.now() - training_start_time).total_seconds()
-            average_time_per_episode = elapsed_time_total / episode if episode > 0 else 0
-            remaining_episodes = num_episodes - episode
-            remaining_time_for_all_episodes = remaining_episodes * average_time_per_episode
-            eta_for_all_episodes = datetime.now() + timedelta(seconds=remaining_time_for_all_episodes)
-
-            athens_tz = pytz.timezone('Europe/Athens')
-            eta_episode_athens = eta_for_episode.astimezone(athens_tz)
-            eta_all_episodes_athens = eta_for_all_episodes.astimezone(athens_tz)
-
-            print(f"Log: Episode: {episode}, ETA for current episode: {eta_episode_athens}, \nLog: ETA for all episodes: {eta_all_episodes_athens}")
-            print(f'Log: Average response time of current episode: {total_response_time / steps:.2f}')
-            print(f'Log: Average response time for all episodes so far: {total_response_time / steps:.2f}')
-            print(f"Log: Action: {action}, Horizontal scaling: {is_horizontal_scale}, Vertical scaling: {is_vertical_scale}")
-            
-            if elapsed_time_episode > seconds_for_next_episode or steps >= 1000:
-                break
-
-        if steps > 0:
-            costs_per_episode.append(total_cost / steps)
-            total_time_per_episode.append(elapsed_time_episode / steps)
-            average_cost_per_episode.append(total_reward / steps)
-            Rmax_violations.append(Rmax_violation_count / steps)
-            average_cpu_utilization.append(total_cpu_utilization / steps)
-            average_cpu_shares.append(total_cpu_shares / steps)
-            average_num_containers.append(total_containers / steps)
-            average_response_time.append(total_response_time / steps)
-            avarage_horizontal_scale.append(horizontal_scaling_count / steps)
-            avarage_vertical_scale.append(vertical_scaling_count / steps)
-            
-            # Calculate metrics for cpu utilization
-            average_cpu_utilization_for_episode = total_cpu_utilization / steps
-            average_cpu_utilization_for_episode = min(average_cpu_utilization_for_episode, 100)
-            average_cpu_utilization_per_episode.append(average_cpu_utilization_for_episode)
-            
-            # Calculate the Rmax violation percentage for the episode
-            rmax_violation_percentage_for_episode = (Rmax_violation_count / steps) * 100
-            average_rmax_violations_per_episode.append(rmax_violation_percentage_for_episode)
-            
-            avarage_horizontal_scale_for_episode = (horizontal_scaling_count / steps)
-            avarage_horizontal_scale_per_episode.append(avarage_horizontal_scale_for_episode)
-            
-            vertical_scaling_for_episode = (vertical_scaling_count / steps)
-            avarage_vertical_scale_per_episode.append(vertical_scaling_for_episode)
-            
-            # Calculate the avarage contaners
-            avarage_containers_for_episode = (total_containers / steps)
-            avarage_containers_per_episode.append(avarage_containers_for_episode)
-
-        else:
-            costs_per_episode.append(0)
-            total_time_per_episode.append(0)
-            average_cost_per_episode.append(0)
-            Rmax_violations.append(0)
-            average_cpu_utilization.append(0)
-            average_cpu_shares.append(0)
-            average_num_containers.append(0)
-            average_response_time.append(0)
-            avarage_horizontal_scale.append(0)
-            avarage_vertical_scale.append(0)
-
-        # Decay epsilon after each episode
+        finalize_episode_metrics(metrics, episode_metrics, steps)
         epsilon = max(epsilon_end, epsilon * epsilon_decay)
-
         episode += 1
-        
-    final_average_rmax_violations = sum(average_rmax_violations_per_episode) / len(average_rmax_violations_per_episode)
-    final_average_cpu_utilization = sum(average_cpu_utilization_per_episode) / len(average_cpu_utilization_per_episode)
-    final_avarage_containers = sum(avarage_containers_per_episode) / len(avarage_containers_per_episode)
-    avarage_response_time = (total_response_time / total_actions)
-    average_cpu_shares_new = (total_cpu_shares / total_actions)
-    average_horizontal_scaling_final = sum(avarage_horizontal_scale_per_episode) / len(avarage_horizontal_scale_per_episode)
-    avarage_vertical_scale_final = sum(avarage_vertical_scale_per_episode) / len(avarage_vertical_scale_per_episode)
 
-    return (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
-            average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time,
-            w_adp, w_perf, w_res, final_average_rmax_violations, final_average_cpu_utilization, final_avarage_containers, avarage_response_time, average_cpu_shares_new,
-            average_horizontal_scaling_final, avarage_vertical_scale_final, avarage_horizontal_scale, avarage_vertical_scale, Q)
+    final_metrics = compute_final_metrics(metrics, total_response_time, total_actions, total_cpu_shares)
+    return format_output(metrics, final_metrics, w_adp, w_perf, w_res, Q)
+
+def initialize_metrics():
+    return {
+        'costs_per_episode': [],
+        'total_time_per_episode': [],
+        'average_cost_per_episode': [],
+        'Rmax_violations': [],
+        'average_cpu_utilization': [],
+        'average_cpu_shares': [],
+        'average_num_containers': [],
+        'average_response_time': [],
+        'average_horizontal_scale': [],
+        'average_vertical_scale': [],
+        'average_horizontal_scale_per_episode': [],
+        'average_vertical_scale_per_episode': [],
+        'average_containers_per_episode': [],
+        'average_rmax_violations_per_episode': [],
+        'average_cpu_utilization_per_episode': []
+    }
+
+def initialize_episode_metrics():
+    return {
+        'total_cpu_utilization': 0,
+        'total_Rmax_violations': 0,
+        'total_containers': 0,
+        'total_cost': 0,
+        'total_reward': 0,
+        'Rmax_violation_count': 0
+    }
+
+def should_terminate_episode(start_time, steps):
+    return (datetime.now() - start_time).total_seconds() > seconds_for_next_episode or steps >= 1000
+
+def compute_cost(w_adp, w_perf, w_res, next_state, action, performance_penalty):
+    a1, a2 = int(action in [1, -1]), int(action in [-512, 512])
+    return Costs.overall_cost_function(w_adp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)
+
+def update_metrics(metrics, episode_metrics, action, performance_penalty, cost, current_state):
+    episode_metrics['total_reward'] += cost
+    episode_metrics['total_cpu_utilization'] += current_state[1]
+    episode_metrics['total_containers'] += current_state[2]
+    episode_metrics['total_cost'] += cost
+
+    if performance_penalty > Rmax:
+        episode_metrics['Rmax_violation_count'] += 1
+        episode_metrics['total_Rmax_violations'] += 1
+
+
+def update_q_table(Q, nearest_state, next_state, action, cost):
+    current_state_idx = state_space.index(nearest_state)
+    next_state_idx = state_space.index(find_nearest_state(next_state, state_space))
+    Q[current_state_idx, action_space.index(action)] = (
+        (1 - alpha) * Q[current_state_idx, action_space.index(action)] +
+        alpha * (cost + gamma * min(Q[next_state_idx, :]))
+    )
+
+def finalize_episode_metrics(metrics, episode_metrics, steps):
+    if steps > 0:
+        metrics['costs_per_episode'].append(episode_metrics['total_cost'] / steps)
+        metrics['average_cost_per_episode'].append(episode_metrics['total_reward'] / steps)
+        metrics['Rmax_violations'].append(episode_metrics['Rmax_violation_count'] / steps)
+        metrics['average_cpu_utilization'].append(episode_metrics['total_cpu_utilization'] / steps)
+        metrics['average_containers_per_episode'].append(episode_metrics['total_containers'] / steps)
+    else:
+        for key in metrics:
+            metrics[key].append(0)
+
+def compute_final_metrics(metrics, total_response_time, total_actions, total_cpu_shares):
+    return {
+        'final_average_rmax_violations': np.mean(metrics['average_rmax_violations_per_episode']),
+        'final_average_cpu_utilization': np.mean(metrics['average_cpu_utilization_per_episode']),
+        'final_average_containers': np.mean(metrics['average_containers_per_episode']),
+        'average_response_time': total_response_time / total_actions,
+        'average_cpu_shares_new': total_cpu_shares / total_actions,
+        'average_horizontal_scaling_final': np.mean(metrics['average_horizontal_scale_per_episode']),
+        'average_vertical_scale_final': np.mean(metrics['average_vertical_scale_per_episode'])
+    }
+
+def format_output(metrics, final_metrics, w_adp, w_perf, w_res, Q):
+    return (
+        metrics['costs_per_episode'], metrics['total_time_per_episode'], metrics['average_cost_per_episode'], metrics['Rmax_violations'],
+        metrics['average_cpu_utilization'], metrics['average_cpu_shares'], metrics['average_num_containers'], metrics['average_response_time'],
+        w_adp, w_perf, w_res, final_metrics['final_average_rmax_violations'], final_metrics['final_average_cpu_utilization'],
+        final_metrics['final_average_containers'], final_metrics['average_response_time'], final_metrics['average_cpu_shares_new'],
+        final_metrics['average_horizontal_scaling_final'], final_metrics['average_vertical_scale_final'], metrics['average_horizontal_scale'], metrics['average_vertical_scale'], Q
+    )
     
 def run_baseline(num_episodes):
     episode = 1
@@ -692,6 +639,7 @@ if __name__ == '__main__':
     w_perf_list, w_adp_list, w_res_list = create_file_with_random_weights(file_path, num_rows=20)    
     
     length = len(w_perf_list)
+    
     
     print("Log: Generated weights:")
     

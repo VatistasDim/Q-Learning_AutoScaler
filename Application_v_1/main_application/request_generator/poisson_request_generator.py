@@ -5,7 +5,7 @@ import os
 
 # Endpoint and request rate setup
 ENDPOINT = os.getenv("ENDPOINT", "http://195.251.56.82:8080/json_endpoint")
-LAMBDA = int(os.getenv("LAMBDA", 5))  # Average requests per minute
+LAMBDA = int(os.getenv("LAMBDA", 20000))  # Average requests per minute
 
 def send_request():
     try:
