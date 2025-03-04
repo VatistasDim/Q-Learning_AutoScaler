@@ -31,8 +31,6 @@ def send_request():
             successful_requests += 1
         else:
             failed_requests += 1
-
-        print(f"Status: {response.status_code}, Time taken: {response_time:.2f} seconds")
     
     except requests.RequestException as e:
         failed_requests += 1

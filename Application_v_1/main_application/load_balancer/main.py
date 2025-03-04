@@ -342,8 +342,7 @@ def log_episode_progress(episode, episode_start_time, training_start_time, steps
     print(f"Total training time elapsed: {elapsed_time:.2f} seconds.")
 
     if episode > 1 and 'average_cost_per_episode' in metrics:
-        window_size = max(1, min(10, episode // 10))
-        recent_costs = metrics['average_cost_per_episode'][-window_size:] if len(metrics['average_cost_per_episode']) >= window_size else metrics['average_cost_per_episode']
+        recent_costs = metrics['average_cost_per_episode'][-5:] if len(metrics['average_cost_per_episode']) >= 5 else metrics['average_cost_per_episode']
         if len(recent_costs) > 1 and recent_costs[-1] < np.mean(recent_costs[:-1]):
             print("Log: Algorithm appears to be learning, as costs are decreasing.")
         else:
@@ -382,7 +381,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
 
             update_metrics(metrics, episode_metrics, action, performance_penalty, cost, current_state)
             update_q_table(Q, nearest_state, next_state, action, cost)
-            log_episode_progress(episode, episode_start_time, training_start_time, steps)
+            log_episode_progress(episode, episode_start_time, training_start_time, steps, metrics)
 
         finalize_episode_metrics(metrics, episode_metrics, steps)
         epsilon = max(epsilon_end, epsilon * epsilon_decay)
