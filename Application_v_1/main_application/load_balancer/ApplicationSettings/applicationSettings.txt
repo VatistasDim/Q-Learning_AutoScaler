@@ -1,5 +1,6 @@
 num_episodes = 80; 
-seconds_for_next_episode; 
+total_episodes = 1;
+seconds_for_next_episode = 60; 
 alpha = 0.1; 
 gamma = 0.99; 
 wait_time = 10; 

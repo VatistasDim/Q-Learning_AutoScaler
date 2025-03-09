@@ -1,12 +1,12 @@
-import numpy as np
+import numpy as np # type: ignore
 import prometheus_metrics
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt # type: ignore
 from datetime import datetime, timedelta
 from docker_api import DockerAPI
 from costs import Costs
 from generate_q_learning_weights import check_and_delete_file, create_file_with_random_weights
 from settings import load_settings
-import pytz, os, itertools, docker, time
+import pytz, os, itertools, docker, time # type: ignore
 
 if not os.path.exists('/app/plots'):
     os.makedirs('/app/plots')
@@ -20,6 +20,7 @@ settings_file = 'ApplicationSettings/ApplicationSettings.txt'
 settings = load_settings(settings_file)
 timezone = pytz.timezone('Europe/Athens')
 Rmax = settings.get('Rmax', 0.80)
+total_episodes = settings.get('total_episodes', 100)
 seconds_for_next_episode = settings.get('seconds_for_next_episode', 60)
 alpha = settings.get('alpha', 0.1)
 gamma = settings.get('gamma', 0.99)
@@ -28,7 +29,7 @@ epsilon_end = settings.get('epsilon_end', 0.1)
 epsilon_decay = settings.get('epsilon_decay', 0.98)
 cres = 0.01
 wait_time = settings.get('wait_time', 15)
-baseline = settings.get('baseline', True)
+baseline = settings.get('baseline', False)
 url = settings.get('url', 'http://prometheus:9090/api/v1/query')
 service_name = settings.get('service_name', 'mystack_application')
 max_replicas = settings.get('max_replicas', 10)
@@ -76,19 +77,25 @@ def transition(action):
     current_cpu_shares = get_current_cpu_shares(service_name)
     print(f"Log: Current CPU shares from transition: {current_cpu_shares}")
 
+    scaling_type = None
+
     if action == -1:  # Scale in (decrease containers)
         print("Log: Decrease Container by 1")
         was_transition_succefull = scale_in(service_name=service_name, scale_out_factor=1)
+        scaling_type = "horizontal"
     elif action == 1:  # Scale out (increase containers)
         print("Log: Increase Container by 1")
         desired_replicas = running_containers + 1
         was_transition_succefull = scale_out(service_name=service_name, desired_replicas=desired_replicas)
+        scaling_type = "horizontal"
     elif action == -512:  # Decrease CPU shares
         print("Log: Decrease CPU shares")
         was_transition_succefull = decrease_cpu_share_step(current_cpu_share=current_cpu_shares)
+        scaling_type = "vertical"
     elif action == 512:  # Increase CPU shares
         print("Log: Increase CPU shares")
         was_transition_succefull = increase_cpu_share_step(current_cpu_share=current_cpu_shares)
+        scaling_type = "vertical"
     elif action == 0:
         print("Log: No Action")
         time.sleep(15)
@@ -97,7 +104,8 @@ def transition(action):
     c, u, k = state()
     new_cpu_shares = get_current_cpu_shares(service_name)
     print(f"Log: New CPU shares after action: {new_cpu_shares}")
-    return (c, u, k)
+    
+    return (c, u, k), scaling_type  # Return the scaling type
 
 def increase_cpu_share_step(current_cpu_share):
     print(f'Log: increase_cpu_share_step --> current_cpu_share:{current_cpu_share}')
@@ -353,6 +361,8 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     metrics = initialize_metrics()
     total_actions, total_cpu_shares, total_response_time = 0, 0, 0
     vertical_scaling_count, horizontal_scaling_count = 0, 0
+    total_cost_per_episode = []
+    total_cpu_utilization_per_episode = []
     epsilon = epsilon_start  # Start with the initial epsilon value
 
     print_training_start_message(num_episodes)
@@ -363,31 +373,43 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         episode_metrics = initialize_episode_metrics()
         next_state, steps = state(), 0
         episode_start_time = datetime.now()
+        episode_total_cost = 0
+        episode_cpu_utilization = 0
 
         while not should_terminate_episode(episode_start_time, steps):
             steps += 1
             current_state = next_state
             nearest_state = find_nearest_state(current_state, state_space)
             action = select_action(Q, nearest_state, epsilon)
-            next_state = transition(action)
+            next_state, scaling_type = transition(action)
 
             if not was_transition_succefull:
                 print('Log: No action because no transition was made.')
                 action = 0
+                
+            if scaling_type == "horizontal":
+                horizontal_scaling_count += 1
+            elif scaling_type == "vertical":
+                vertical_scaling_count += 1
 
             fetched_data = fetch_data()
             performance_penalty = ensure_performance_penalty_has_data(fetched_data[3])
             cost = compute_cost(w_adp, w_perf, w_res, next_state, action, performance_penalty)
 
+            episode_total_cost += cost
+            episode_cpu_utilization += fetched_data[1]
+            
             update_metrics(metrics, episode_metrics, action, performance_penalty, cost, current_state)
             update_q_table(Q, nearest_state, next_state, action, cost)
             log_episode_progress(episode, episode_start_time, training_start_time, steps, metrics)
 
         finalize_episode_metrics(metrics, episode_metrics, steps)
+        total_cost_per_episode.append(episode_total_cost)
+        total_cpu_utilization_per_episode.append(episode_cpu_utilization / steps)
         epsilon = max(epsilon_end, epsilon * epsilon_decay)
         episode += 1
 
-    final_metrics = compute_final_metrics(metrics, total_response_time, total_actions, total_cpu_shares)
+    final_metrics = compute_final_metrics(metrics, total_response_time, total_actions, total_cpu_shares, total_cost_per_episode, total_cpu_utilization_per_episode)
     return format_output(metrics, final_metrics, w_adp, w_perf, w_res, Q)
 
 def initialize_metrics():
@@ -456,24 +478,28 @@ def finalize_episode_metrics(metrics, episode_metrics, steps):
         for key in metrics:
             metrics[key].append(0)
 
-def compute_final_metrics(metrics, total_response_time, total_actions, total_cpu_shares):
+def compute_final_metrics(metrics, total_response_time, total_actions, total_cpu_shares, total_cost_per_episode, total_cpu_utilization_per_episode):
     return {
         'final_average_rmax_violations': np.mean(metrics['average_rmax_violations_per_episode']),
-        'final_average_cpu_utilization': np.mean(metrics['average_cpu_utilization_per_episode']),
+        'final_average_cpu_utilization': np.mean(total_cpu_utilization_per_episode),
         'final_average_containers': np.mean(metrics['average_containers_per_episode']),
         'average_response_time': total_response_time / total_actions,
         'average_cpu_shares_new': total_cpu_shares / total_actions,
         'average_horizontal_scaling_final': np.mean(metrics['average_horizontal_scale_per_episode']),
-        'average_vertical_scale_final': np.mean(metrics['average_vertical_scale_per_episode'])
+        'average_vertical_scale_final': np.mean(metrics['average_vertical_scale_per_episode']),
+        'final_average_cost_per_episode': np.mean(total_cost_per_episode)
     }
 
 def format_output(metrics, final_metrics, w_adp, w_perf, w_res, Q):
     return (
-        metrics['costs_per_episode'], metrics['total_time_per_episode'], metrics['average_cost_per_episode'], metrics['Rmax_violations'],
-        metrics['average_cpu_utilization'], metrics['average_cpu_shares'], metrics['average_num_containers'], metrics['average_response_time'],
-        w_adp, w_perf, w_res, final_metrics['final_average_rmax_violations'], final_metrics['final_average_cpu_utilization'],
-        final_metrics['final_average_containers'], final_metrics['average_response_time'], final_metrics['average_cpu_shares_new'],
-        final_metrics['average_horizontal_scaling_final'], final_metrics['average_vertical_scale_final'], metrics['average_horizontal_scale'], metrics['average_vertical_scale'], Q
+        metrics['costs_per_episode'],  
+        final_metrics['final_average_containers'],  
+        final_metrics['average_response_time'],  
+        final_metrics['average_horizontal_scaling_final'],  
+        final_metrics['average_vertical_scale_final'],  
+        final_metrics['final_average_cost_per_episode'],
+        final_metrics['final_average_cpu_utilization'],
+        w_adp, w_perf, w_res, Q
     )
     
 def run_baseline(num_episodes):
@@ -578,14 +604,14 @@ def run_baseline(num_episodes):
     return (total_time_per_episode, average_rmax_violations_per_episode, average_cpu_utilization_per_episode, average_response_time,
             final_average_rmax_violations, final_average_cpu_utilization, final_average_response_time)
 
-def plot_metric(iterations, metric, ylabel, title, filename):
-    plt.figure(figsize=(10, 6))
-    plt.plot(iterations, metric, label=title)
-    plt.xlabel('Episode')
+def plot_metric(x, y, ylabel, title, filename):
+    """Generic function to plot a metric."""
+    plt.figure(figsize=(10, 5))
+    plt.plot(x, y, marker='o', linestyle='-')
+    plt.xlabel("Episodes")
     plt.ylabel(ylabel)
     plt.title(title)
-    plt.legend()
-    plt.tight_layout()
+    plt.grid(True)
     plt.savefig(filename)
     plt.close()
 
@@ -596,35 +622,69 @@ def save_final_statistics(statistics, filename):
 def save_q_values(q, filename):
     np.save(filename, q)
 
-def create_plots(run_number, iterations):
-        plot_metric(iterations, costs_per_episode, 'Total Cost', 'Total Cost per Episode', f'/app/plots/total_cost_per_episode_{run_number}.png')
-        plot_metric(iterations, total_time_per_episode, 'Total Time', 'Total Time per Episode', f'/app/plots/total_time_per_episode_{run_number}.png')
-        plot_metric(iterations, average_cost_per_episode, 'Average Cost', 'Average Cost per Episode', f'/app/plots/average_cost_per_episode_{run_number}.png')
-        plot_metric(iterations, Rmax_violations, 'Rmax Violations (%)', 'Rmax Violations per Episode', f'/app/plots/rmax_violations_per_episode_{run_number}.png')
-        plot_metric(iterations, average_cpu_utilization, 'Average CPU Utilization (%)', 'Average CPU Utilization per Episode', f'/app/plots/average_cpu_utilization_per_episode_{run_number}.png')
-        plot_metric(iterations, average_cpu_shares, 'Average CPU Shares (%)', 'Average CPU Shares per Episode', f'/app/plots/average_cpu_shares_per_episode_{run_number}.png')
-        plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode', f'/app/plots/average_num_containers_per_episode_{run_number}.png')
-        plot_metric(iterations, average_response_time, 'Average Response Time (s)', 'Average Response Time per Episode', f'/app/plots/average_response_time_per_episode_{run_number}.png')
-        plot_metric(iterations, avarage_horizontal_scale, 'Average Horizontal Scale', 'Average Horizontal Scale per Episode', f'/app/plots/average_horizontal_scale_per_episode_{run_number}.png')
-        plot_metric(iterations, avarage_vertical_scale, 'Average Vertical Scale', 'Average Vertical Scale per Episode', f'/app/plots/average_response_time_per_episode_{run_number}.png')
+def create_plots(run_number, iterations, 
+                 average_num_containers, 
+                 average_horizontal_scaling_final, 
+                 average_vertical_scale_final, 
+                 avarage_response_time_new,
+                 average_cost_per_episode,
+                 average_cpu_utilization):
+    """Generates plots for the specified metrics."""
 
-def gather_learning_metrics_and_save(run_number, q, num_episodes, w_perf, w_res, w_adp, Rmax, rmax_violations_percantage, 
-                                     cpu_utilization_percentage, average_cpu_shares_new, containers_percentage, 
-                                     avarage_response_time_new, average_horizontal_scaling_final, avarage_vertical_scale_final):
+    # Number of containers per episode
+    plot_metric(iterations, average_num_containers, 
+                'Number of Containers', 'Containers per Episode', 
+                f'/app/plots/num_containers_per_episode_{run_number}.png')
+
+    # Number of vertical scaling actions per episode
+    plot_metric(iterations, average_vertical_scale_final, 
+                'Number of Vertical Scaling Actions', 'Vertical Scaling per Episode', 
+                f'/app/plots/vertical_scaling_per_episode_{run_number}.png')
+
+    # Number of horizontal scaling actions per episode
+    plot_metric(iterations, average_horizontal_scaling_final, 
+                'Number of Horizontal Scaling Actions', 'Horizontal Scaling per Episode', 
+                f'/app/plots/horizontal_scaling_per_episode_{run_number}.png')
+
+    # Average response time in milliseconds per episode
+    plot_metric(iterations, np.array(avarage_response_time_new) * 1000, 
+                'Response Time (ms)', 'Average Response Time per Episode', 
+                f'/app/plots/avg_response_time_per_episode_{run_number}.png')
+
+    # Average cost per episode
+    plot_metric(iterations, average_cost_per_episode, 
+                'Cost per Episode', 'Average Cost per Episode', 
+                f'/app/plots/avg_cost_per_episode_{run_number}.png')
+
+    # Average CPU utilization per episode
+    plot_metric(iterations, average_cpu_utilization, 
+                'CPU Utilization (%)', 'Average CPU Utilization per Episode', 
+                f'/app/plots/avg_cpu_utilization_per_episode_{run_number}.png')
+
+    print(f"Plots saved for run {run_number}")
+
+def gather_learning_metrics_and_save(run_number, q, num_episodes, w_perf, w_res, w_adp, Rmax, 
+                                     rmax_violations_percantage, cpu_utilization_percentage, 
+                                     average_cpu_shares_new, containers_percentage, 
+                                     avarage_response_time_new, average_horizontal_scaling_final, 
+                                     avarage_vertical_scale_final, average_cost_per_episode, average_cpu_utilization):
     q_learning_log_path = f'/logs/q-learning-final-log_{run_number}.txt'
     q_learning_values_path = f'/logs/q-values_{run_number}.npy'
     q_learning_statistics = (
-            f"Q-learning Final Episode Statistics:\n"
-            f"Estimated Running Time: {(num_episodes * seconds_for_next_episode) / 60:.2f} in minutes\n"
-            f"Wperf = {w_perf}, Wres = {w_res}, Wadp = {w_adp}, Rmax = {Rmax}\n"
-            f"Rmax Violations: {rmax_violations_percantage:.2f}%\n"
-            f"Average CPU Utilization: {cpu_utilization_percentage:.2f}%\n"
-            f"Average CPU Shares: {average_cpu_shares_new:.2f}\n"
-            f"Average Number of Containers: {containers_percentage:.2f}\n"
-            f"Average Response Time: {avarage_response_time_new:.2f} s\n"
-            f"Average Vertical Scale: {avarage_vertical_scale_final:.2f} %\n"
-            f"Average Horizontal Scale: {average_horizontal_scaling_final:.2f} %\n"
-        )
+        f"Q-learning Final Episode Statistics:\n"
+        f"Estimated Running Time: {(num_episodes * seconds_for_next_episode) / 60:.2f} minutes\n"
+        f"Wperf = {w_perf}, Wres = {w_res}, Wadp = {w_adp}, Rmax = {Rmax}\n"
+        f"Rmax Violations: {rmax_violations_percantage:.2f}%\n"
+        f"Average CPU Utilization: {cpu_utilization_percentage:.2f}%\n"
+        f"Average CPU Shares: {average_cpu_shares_new:.2f}\n"
+        f"Average Number of Containers: {containers_percentage:.2f}\n"
+        f"Average Response Time: {avarage_response_time_new:.2f} s\n"
+        f"Average Vertical Scale: {avarage_vertical_scale_final:.2f}%\n"
+        f"Average Horizontal Scale: {average_horizontal_scaling_final:.2f}%\n"
+        f"Average Cost per Episode: {average_cost_per_episode:.4f}\n"
+        f"Average CPU Utilization per Episode: {average_cpu_utilization:.2f}%\n"
+    )
+    
     save_final_statistics(q_learning_statistics, q_learning_log_path)
     save_q_values(q, q_learning_values_path)
     print(q_learning_statistics)
@@ -639,7 +699,6 @@ if __name__ == '__main__':
     
     length = len(w_perf_list)
     
-    
     print("Log: Generated weights:")
     
     for i in range(length):
@@ -649,36 +708,52 @@ if __name__ == '__main__':
         
         reset_environment_to_initial_state()
         
-        num_episodes = 1
-        
         # Initialize Q-table
         Q = np.zeros((len(state_space), len(action_space)))
-        q_learning_metrics = run_q_learning(num_episodes, w_perf_list[i], w_adp_list[i], w_res_list[i])     
-        (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
-        average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time,
-        w_adp, w_perf, w_res, rmax_violations_percantage, cpu_utilization_percentage, containers_percentage, avarage_response_time_new, average_cpu_shares_new,
-        average_horizontal_scaling_final, avarage_vertical_scale_final, avarage_horizontal_scale, avarage_vertical_scale, q) = q_learning_metrics
         
+        q_learning_metrics = run_q_learning(total_episodes, w_perf_list[i], w_adp_list[i], w_res_list[i])     
+        
+        (costs_per_episode,
+        average_num_containers,
+        avarage_response_time_new,
+        average_horizontal_scaling_final,
+        avarage_vertical_scale_final,
+        average_cost_per_episode,
+        average_cpu_utilization,
+        w_adp, w_perf, w_res, q) = q_learning_metrics
         num_iterations = len(costs_per_episode)
-        iterations = range(1, num_iterations + 1)
-        running_time = num_episodes * seconds_for_next_episode / 60
         
-        create_plots(run_number= i, iterations=iterations)
+        iterations = range(1, num_iterations + 1)
+        
+        running_time = total_episodes * seconds_for_next_episode / 60
+        
+        create_plots(run_number=i, 
+                    iterations=iterations, 
+                    average_num_containers=average_num_containers, 
+                    average_horizontal_scaling_final=average_horizontal_scaling_final, 
+                    average_vertical_scale_final=avarage_vertical_scale_final, 
+                    avarage_response_time_new=avarage_response_time_new,
+                    average_cost_per_episode=average_cost_per_episode,
+                    average_cpu_utilization=average_cpu_utilization)
+        
         gather_learning_metrics_and_save(i, 
                                         q, 
-                                        running_time, 
+                                        total_episodes, 
                                         w_perf, 
                                         w_res, 
-                                        w_adp, Rmax, rmax_violations_percantage, 
-                                        cpu_utilization_percentage, average_cpu_shares_new, 
-                                        containers_percentage, avarage_response_time_new, 
-                                        average_horizontal_scaling_final, avarage_vertical_scale_final)
+                                        w_adp, 
+                                        Rmax, 
+                                        avarage_response_time_new, 
+                                        average_horizontal_scaling_final, 
+                                        avarage_vertical_scale_final, 
+                                        average_cost_per_episode,
+                                        average_cpu_utilization)
 
     reset_environment_to_initial_state()
     
     if baseline:
         # Run baseline scenario (without Q-learning) and gather metrics
-        baseline_metrics = run_baseline(num_episodes)
+        baseline_metrics = run_baseline(total_episodes)
         
         # Extract metrics
         total_time_per_episode, Rmax_violations, average_cpu_utilization, average_response_time, rmax_violations_percantage, cpu_utilization_percentage, avarage_response_time= baseline_metrics
@@ -696,7 +771,7 @@ if __name__ == '__main__':
         # Prepare final episode statistics for baseline
         baseline_statistics = (
             f"Baseline Final Episode Statistics:\n"
-            f"Rmax Violations: {Rmax_violations[-1] * 100 / num_episodes:.2f}%\n"
+            f"Rmax Violations: {Rmax_violations[-1] * 100 / total_episodes:.2f}%\n"
             f"Average CPU Utilization: {average_cpu_utilization[-1]:.2f}%\n"
             f"Average Number of Containers: {average_num_containers[-1]:.2f}\n"
             f"Average Response Time: {average_response_time[-1]:.2f} ms\n"
