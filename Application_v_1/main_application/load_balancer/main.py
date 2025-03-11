@@ -481,13 +481,14 @@ def finalize_episode_metrics(metrics, episode_metrics, steps):
 def compute_final_metrics(metrics, total_response_time, total_actions, total_cpu_shares, total_cost_per_episode, total_cpu_utilization_per_episode):
     return {
         'final_average_rmax_violations': np.mean(metrics['average_rmax_violations_per_episode']),
-        'final_average_cpu_utilization': np.mean(total_cpu_utilization_per_episode),
+        'final_average_cpu_utilization': np.mean(metrics['average_cpu_utilization_per_episode']),
         'final_average_containers': np.mean(metrics['average_containers_per_episode']),
-        'average_response_time': total_response_time / total_actions,
-        'average_cpu_shares_new': total_cpu_shares / total_actions,
+        'average_response_time': (total_response_time / total_actions) if total_actions > 0 else 0,  # ✅ Fix
+        'average_cpu_shares_new': (total_cpu_shares / total_actions) if total_actions > 0 else 0,  # ✅ Fix
+        'average_cost_per_episode': (total_cost_per_episode / total_actions) if total_actions > 0 else 0,  # ✅ New fix
+        'average_cpu_utilization_per_episode': (total_cpu_utilization_per_episode / total_actions) if total_actions > 0 else 0,  # ✅ New fix
         'average_horizontal_scaling_final': np.mean(metrics['average_horizontal_scale_per_episode']),
-        'average_vertical_scale_final': np.mean(metrics['average_vertical_scale_per_episode']),
-        'final_average_cost_per_episode': np.mean(total_cost_per_episode)
+        'average_vertical_scale_final': np.mean(metrics['average_vertical_scale_per_episode'])
     }
 
 def format_output(metrics, final_metrics, w_adp, w_perf, w_res, Q):
