@@ -664,8 +664,6 @@ def create_plots(run_number, iterations,
     print(f"Plots saved for run {run_number}")
 
 def gather_learning_metrics_and_save(run_number, q, num_episodes, w_perf, w_res, w_adp, Rmax, 
-                                     rmax_violations_percantage, cpu_utilization_percentage, 
-                                     average_cpu_shares_new, containers_percentage, 
                                      avarage_response_time_new, average_horizontal_scaling_final, 
                                      avarage_vertical_scale_final, average_cost_per_episode, average_cpu_utilization):
     q_learning_log_path = f'/logs/q-learning-final-log_{run_number}.txt'
@@ -674,17 +672,12 @@ def gather_learning_metrics_and_save(run_number, q, num_episodes, w_perf, w_res,
         f"Q-learning Final Episode Statistics:\n"
         f"Estimated Running Time: {(num_episodes * seconds_for_next_episode) / 60:.2f} minutes\n"
         f"Wperf = {w_perf}, Wres = {w_res}, Wadp = {w_adp}, Rmax = {Rmax}\n"
-        f"Rmax Violations: {rmax_violations_percantage:.2f}%\n"
-        f"Average CPU Utilization: {cpu_utilization_percentage:.2f}%\n"
-        f"Average CPU Shares: {average_cpu_shares_new:.2f}\n"
-        f"Average Number of Containers: {containers_percentage:.2f}\n"
         f"Average Response Time: {avarage_response_time_new:.2f} s\n"
         f"Average Vertical Scale: {avarage_vertical_scale_final:.2f}%\n"
         f"Average Horizontal Scale: {average_horizontal_scaling_final:.2f}%\n"
         f"Average Cost per Episode: {average_cost_per_episode:.4f}\n"
         f"Average CPU Utilization per Episode: {average_cpu_utilization:.2f}%\n"
-    )
-    
+    )    
     save_final_statistics(q_learning_statistics, q_learning_log_path)
     save_q_values(q, q_learning_values_path)
     print(q_learning_statistics)
@@ -736,6 +729,7 @@ if __name__ == '__main__':
                     average_cost_per_episode=average_cost_per_episode,
                     average_cpu_utilization=average_cpu_utilization)
         
+        # TODO: fix argument positioning!
         gather_learning_metrics_and_save(i, 
                                         q, 
                                         total_episodes, 
