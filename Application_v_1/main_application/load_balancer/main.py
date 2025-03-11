@@ -498,7 +498,7 @@ def format_output(metrics, final_metrics, w_adp, w_perf, w_res, Q):
         final_metrics['average_response_time'],  
         final_metrics['average_horizontal_scaling_final'],  
         final_metrics['average_vertical_scale_final'],  
-        final_metrics['final_average_cost_per_episode'],
+        final_metrics['average_cost_per_episode'],
         final_metrics['final_average_cpu_utilization'],
         w_adp, w_perf, w_res, Q
     )
