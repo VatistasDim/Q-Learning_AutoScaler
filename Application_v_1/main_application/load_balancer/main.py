@@ -37,6 +37,7 @@ min_replicas = settings.get('min_replicas', 1)
 max_containers = settings.get('max_containers', 11)
 
 print(f'Rmax: {Rmax}')
+print(f'Total Episodes: {total_episodes}')
 print(f'seconds_for_next_episode: {seconds_for_next_episode}')
 print(f'alpha: {alpha}')
 print(f'gamma: {gamma}')
@@ -370,6 +371,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     training_start_time = datetime.now()
 
     while episode <= num_episodes:
+        episode_start_time = datetime.now()
         print(f'Log: Episode: {episode}')
         episode_metrics = initialize_episode_metrics()
         next_state, steps = state(), 0
@@ -465,7 +467,7 @@ def initialize_episode_metrics():
     }
 
 def should_terminate_episode(start_time, steps):
-    return (datetime.now() - start_time).total_seconds() > seconds_for_next_episode or steps >= 1000
+    return (datetime.now() - start_time).total_seconds() >= seconds_for_next_episode
 
 def compute_cost(w_adp, w_perf, w_res, next_state, action, performance_penalty):
     a1, a2 = int(action in [1, -1]), int(action in [-512, 512])
@@ -762,7 +764,6 @@ if __name__ == '__main__':
                     average_cost_per_episode=average_cost_per_episode,
                     average_cpu_utilization=average_cpu_utilization)
         
-        # TODO: fix argument positioning!
         gather_learning_metrics_and_save(i, q, total_episodes, w_perf, w_res, w_adp, Rmax,
                                  avarage_response_time_new, average_horizontal_scaling_final,
                                  avarage_vertical_scale_final, average_cost_per_episode,
