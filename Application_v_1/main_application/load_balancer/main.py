@@ -366,6 +366,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     total_cost_per_episode = []
     total_cpu_utilization_per_episode = []
     epsilon = epsilon_start
+    seconds_for_next_episode = 60  # Ensure each episode lasts 60 seconds
 
     print_training_start_message(num_episodes)
     training_start_time = datetime.now()
@@ -375,11 +376,10 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         print(f'Log: Episode: {episode}')
         episode_metrics = initialize_episode_metrics()
         next_state, steps = state(), 0
-        episode_start_time = datetime.now()
         episode_total_cost = 0
         episode_cpu_utilization = 0
 
-        while not should_terminate_episode(episode_start_time, steps):
+        while not should_terminate_episode(episode_start_time):
             steps += 1
             current_state = next_state
             nearest_state = find_nearest_state(current_state, state_space)
@@ -389,7 +389,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             if not was_transition_succefull:
                 print('Log: No action because no transition was made.')
                 action = 0
-                
+
             if scaling_type == "horizontal":
                 horizontal_scaling_count += 1
             elif scaling_type == "vertical":
@@ -466,8 +466,8 @@ def initialize_episode_metrics():
         'Rmax_violation_count': 0
     }
 
-def should_terminate_episode(start_time, steps):
-    return (datetime.now() - start_time).total_seconds() >= seconds_for_next_episode
+def should_terminate_episode(start_time):
+    return (datetime.now() - start_time).total_seconds() >= 60
 
 def compute_cost(w_adp, w_perf, w_res, next_state, action, performance_penalty):
     a1, a2 = int(action in [1, -1]), int(action in [-512, 512])
