@@ -8,7 +8,7 @@ WORKDIR /app
 COPY . /app
 
 # Install required packages
-RUN pip install Flask prometheus_client psutil
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Expose port for Flask app
 EXPOSE 8082
