@@ -1,5 +1,6 @@
 from flask import Flask, render_template, send_file, jsonify, request
 from prometheus_client import start_http_server, Gauge, Histogram, generate_latest
+import numpy as np
 import time, psutil, threading, json
 
 # Define Prometheus metrics
@@ -131,23 +132,39 @@ def streaming():
     video_path = 'static/video/video_1.mp4'
     return send_file(video_path, mimetype='video/mp4')
 
+def perform_big_calculation(_):
+    size = 300
+    A = np.random.rand(size, size)
+    B = np.random.rand(size, size)
+    C = A @ B
+    return {"matrix_size": size, "calculation_done": True}
+
 @app.route('/json_endpoint', methods=['GET'])
 def json_endpoint():
-    """
-    Exposes a JSON endpoint, reading data from data.json.
+    # """
+    # Exposes a JSON endpoint, reading data from data.json.
 
-    Returns:
-        flask.Response: JSON response.
+    # Returns:
+    #     flask.Response: JSON response.
+    # """
     """
-    file_path = 'json_data/data.json'
-    try:
-        with open(file_path, 'r') as file:
-            data = json.load(file)
-        return jsonify(data)
-    except FileNotFoundError:
-        return jsonify({'error': 'JSON file not found'}), 404
-    except json.JSONDecodeError:
-        return jsonify({'error': 'Error decoding JSON file'}), 500
+    Simulates load by performing a matrix multiplication.
+    
+    Returns:
+        flask.Response: JSON response with calculation result.
+    """
+    result = perform_big_calculation(None)
+    return jsonify(result)
+    # file_path = 'json_data/data.json'
+    # try:
+    #     with open(file_path, 'r') as file:
+    #         data = json.load(file)
+    #     return jsonify(data)
+    # except FileNotFoundError:
+    #     return jsonify({'error': 'JSON file not found'}), 404
+    # except json.JSONDecodeError:
+    #     return jsonify({'error': 'Error decoding JSON file'}), 500
+
 
 if __name__ == '__main__':
     metric_update_thread = threading.Thread(target=update_metrics)
