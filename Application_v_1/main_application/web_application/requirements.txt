@@ -1,2 +1,4 @@
 flask
 numpy
+prometheus_client
+psutil
