@@ -659,8 +659,8 @@ def create_plots(run_number, iterations):
         plot_metric(iterations, average_cpu_shares, 'Average CPU Shares (%)', 'Average CPU Shares per Episode', f'/app/plots/average_cpu_shares_per_episode_0{run_number}.png')
         plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode', f'/app/plots/average_num_containers_per_episode_0{run_number}.png')
         plot_metric(iterations, average_response_time, 'Average Response Time (s)', 'Average Response Time per Episode', f'/app/plots/average_response_time_per_episode_0{run_number}.png')
-        plot_metric(iterations, average_horizontal_scaling_final, 'Average Horizontal Scale (%)', 'Average Horizontal Scale per Episode', f'/app/plots/average_horizontal_scale_per_episode_0{run_number}.png')
-        plot_metric(iterations, avarage_vertical_scale_final, 'Average Vertical Scale (%)', 'Average Vertical Scale per Episode', f'/app/plots/average_response_time_per_episode_0{run_number}.png')
+        plot_metric(iterations, avarage_horizontal_scale, 'Average Horizontal Scale (mean)', 'Average Horizontal Scale per Episode', f'/app/plots/average_horizontal_scale_per_episode_0{run_number}.png')
+        plot_metric(iterations, avarage_vertical_scale, 'Average Vertical Scale (mean)', 'Average Vertical Scale per Episode', f'/app/plots/average_response_time_per_episode_0{run_number}.png')
 
 def gather_learning_metrics_and_save(run_number, q, num_episodes, w_perf, w_res, w_adp, Rmax, rmax_violations_percantage, 
                                      cpu_utilization_percentage, average_cpu_shares_new, containers_percentage, 
