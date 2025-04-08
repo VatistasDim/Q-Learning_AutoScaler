@@ -27,7 +27,7 @@ epsilon_start = settings.get('epsilon_start', 1.0)
 epsilon_end = settings.get('epsilon_end', 0.1)
 epsilon_decay = settings.get('epsilon_decay', 0.98)
 cres = 0.01
-wait_time = settings.get('wait_time', 15)
+wait_time = settings.get('wait_time', 10)
 baseline = settings.get('baseline', True)
 url = settings.get('url', 'http://prometheus:9090/api/v1/query')
 service_name = settings.get('service_name', 'mystack_application')
@@ -91,7 +91,7 @@ def transition(action):
         was_transition_succefull = increase_cpu_share_step(current_cpu_share=current_cpu_shares)
     elif action == 0:
         print("Log: No Action")
-        time.sleep(15)
+        time.sleep(5)
         was_transition_succefull = True
 
     c, u, k = state()
@@ -125,7 +125,7 @@ def select_action(Q, state, epsilon):
         return action_space[np.argmin(Q[state_idx])]
 
 def fetch_data():
-    max_attempts = 3
+    max_attempts = 100
     for attempt in range(max_attempts):
         try:
             cpu_percent, ram_percent, time_up, response_time, cpu_shares = prometheus_metrics.start_metrics_service(url=url)
@@ -141,7 +141,7 @@ def fetch_data():
         except Exception as e:
             print(f"Error: An error occurred during service metrics retrieval (Attempt {attempt + 1}/{max_attempts}):", e)
             if attempt < max_attempts - 1:
-                time.sleep(60)
+                time.sleep(5)
     print("Failed to retrieve metrics after multiple attempts.")
     return None, None, None, None, None
 
@@ -219,12 +219,12 @@ def set_cpu_shares(service_name, cpu_shares):
             resources['Limits']['NanoCPUs'] = desired_cpu_shares_nano
             service.update(resources=resources)
             print(f"Log: CPU shares set to {desired_cpu_shares_nano} NanoCPUs for service {service_name}")
-            time.sleep(15)
+            time.sleep(wait_time)
             break  # Exit the loop if successful
         except KeyError as e:
             if 'NodeID' in str(e):
-                print(f"Warning: 'NodeID' not found in service task on attempt {attempt + 1}. Retrying in 30 seconds...")
-                time.sleep(30)
+                print(f"Warning: 'NodeID' not found in service task on attempt {attempt + 1}. Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
             else:
                 print(f"Error: Unexpected KeyError: {e}")
                 break
@@ -253,7 +253,7 @@ def scale_out(service_name, desired_replicas):
         service = client.services.get(service_name)
         service.scale(desired_replicas)
         print(f"Log: Service '{service_name}' scaled to {desired_replicas} replicas.")
-        time.sleep(15)
+        time.sleep(wait_time)
         return True
     else:
         print("Log: Maximum containers reached, transition not possible.")
@@ -267,7 +267,7 @@ def scale_in(service_name, scale_out_factor):
         desired_replicas = current_replicas - scale_out_factor
         service.scale(desired_replicas)
         print(f"Log: Service '{service_name}' scaled to {desired_replicas} replicas.")
-        time.sleep(15)
+        time.sleep(wait_time)
         return True
     else:
         print(f'Log: Minimum containers reached, transtion is not possible.')
@@ -303,8 +303,8 @@ def ensure_performance_penalty_has_data(performance_data):
         - The process repeats until a valid performance penalty (non-None, non-NaN) is retrieved.
     """
     while performance_data is None or np.isnan(performance_data):
-        print("Error: Performance penalty is None or NaN. Retrying every 2 seconds ...")
-        time.sleep(2)
+        print(f"Error: Performance penalty is None or NaN. Retrying every {wait_time} seconds ...")
+        time.sleep(wait_time)
         fetched_data = fetch_data()
         _, _, _, performance_data, _ = fetched_data
     return performance_data
@@ -345,7 +345,6 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     average_cpu_utilization = []
     average_cost_per_episode = []
     avarage_horizontal_scale = []
-    avarage_vertical_scale = []
     avarage_vertical_scale_per_episode = []
     avarage_horizontal_scale_per_episode = []
     avarage_containers_per_episode = []
@@ -493,8 +492,8 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             avarage_horizontal_scale_for_episode = (horizontal_scaling_count / steps)
             avarage_horizontal_scale_per_episode.append(avarage_horizontal_scale_for_episode)
             
-            vertical_scaling_for_episode = (vertical_scaling_count / steps)
-            avarage_vertical_scale_per_episode.append(vertical_scaling_for_episode)
+            vertical_scaling_percentage_for_episode = (vertical_scaling_count / steps) * 100
+            avarage_vertical_scale_per_episode.append(vertical_scaling_percentage_for_episode)
             
             # Calculate the avarage contaners
             avarage_containers_for_episode = (total_containers / steps)
@@ -570,7 +569,7 @@ def run_baseline(num_episodes):
             if performance_penalty > Rmax:
                 Rmax_violation_count += 1
             
-            time.sleep(10)
+            time.sleep(wait_time)
             
             # Calculate ETA for the episode
             elapsed_time_episode = (datetime.now() - episode_start_time).total_seconds()
@@ -651,20 +650,20 @@ def save_q_values(q, filename):
     np.save(filename, q)
 
 def create_plots(run_number, iterations):
-        plot_metric(iterations, costs_per_episode, 'Total Cost', 'Total Cost per Episode', f'/app/plots/total_cost_per_episode_{run_number}.png')
-        plot_metric(iterations, total_time_per_episode, 'Total Time', 'Total Time per Episode', f'/app/plots/total_time_per_episode_{run_number}.png')
-        plot_metric(iterations, average_cost_per_episode, 'Average Cost', 'Average Cost per Episode', f'/app/plots/average_cost_per_episode_{run_number}.png')
-        plot_metric(iterations, Rmax_violations, 'Rmax Violations (%)', 'Rmax Violations per Episode', f'/app/plots/rmax_violations_per_episode_{run_number}.png')
-        plot_metric(iterations, average_cpu_utilization, 'Average CPU Utilization (%)', 'Average CPU Utilization per Episode', f'/app/plots/average_cpu_utilization_per_episode_{run_number}.png')
-        plot_metric(iterations, average_cpu_shares, 'Average CPU Shares (%)', 'Average CPU Shares per Episode', f'/app/plots/average_cpu_shares_per_episode_{run_number}.png')
-        plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode', f'/app/plots/average_num_containers_per_episode_{run_number}.png')
-        plot_metric(iterations, average_response_time, 'Average Response Time (s)', 'Average Response Time per Episode', f'/app/plots/average_response_time_per_episode_{run_number}.png')
-        plot_metric(iterations, avarage_horizontal_scale, 'Average Horizontal Scale', 'Average Horizontal Scale per Episode', f'/app/plots/average_horizontal_scale_per_episode_{run_number}.png')
-        plot_metric(iterations, avarage_vertical_scale, 'Average Vertical Scale', 'Average Vertical Scale per Episode', f'/app/plots/average_response_time_per_episode_{run_number}.png')
+        plot_metric(iterations, costs_per_episode, 'Total Cost', 'Total Cost per Episode', f'/app/plots/total_cost_per_episode_0{run_number}.png')
+        plot_metric(iterations, total_time_per_episode, 'Total Time', 'Total Time per Episode', f'/app/plots/total_time_per_episode_0{run_number}.png')
+        plot_metric(iterations, average_cost_per_episode, 'Average Cost', 'Average Cost per Episode', f'/app/plots/average_cost_per_episode_0{run_number}.png')
+        plot_metric(iterations, Rmax_violations, 'Rmax Violations (%)', 'Rmax Violations per Episode', f'/app/plots/rmax_violations_per_episode_0{run_number}.png')
+        plot_metric(iterations, average_cpu_utilization, 'Average CPU Utilization (%)', 'Average CPU Utilization per Episode', f'/app/plots/average_cpu_utilization_per_episode_0{run_number}.png')
+        plot_metric(iterations, average_cpu_shares, 'Average CPU Shares (%)', 'Average CPU Shares per Episode', f'/app/plots/average_cpu_shares_per_episode_0{run_number}.png')
+        plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode', f'/app/plots/average_num_containers_per_episode_0{run_number}.png')
+        plot_metric(iterations, average_response_time, 'Average Response Time (s)', 'Average Response Time per Episode', f'/app/plots/average_response_time_per_episode_0{run_number}.png')
+        plot_metric(iterations, avarage_horizontal_scale, 'Average Horizontal Scale (%)', 'Average Horizontal Scale per Episode', f'/app/plots/average_horizontal_scale_per_episode_0{run_number}.png')
+        plot_metric(iterations, avarage_vertical_scale, 'Average Vertical Scale (%)', 'Average Vertical Scale per Episode', f'/app/plots/average_response_time_per_episode_0{run_number}.png')
 
 def gather_learning_metrics_and_save(run_number, q, num_episodes, w_perf, w_res, w_adp, Rmax, rmax_violations_percantage, 
                                      cpu_utilization_percentage, average_cpu_shares_new, containers_percentage, 
-                                     avarage_response_time_new, average_horizontal_scaling_final, avarage_vertical_scale_final):
+                                     avarage_response_time_new, average_horizontal_scaling_final, avarage_vertical_scale_final, avarage_horizontal_scale, avarage_vertical_scale):
     q_learning_log_path = f'/logs/q-learning-final-log_{run_number}.txt'
     q_learning_values_path = f'/logs/q-values_{run_number}.npy'
     q_learning_statistics = (
@@ -676,8 +675,10 @@ def gather_learning_metrics_and_save(run_number, q, num_episodes, w_perf, w_res,
             f"Average CPU Shares: {average_cpu_shares_new:.2f}\n"
             f"Average Number of Containers: {containers_percentage:.2f}\n"
             f"Average Response Time: {avarage_response_time_new:.2f} s\n"
-            f"Average Vertical Scale: {avarage_vertical_scale_final:.2f} %\n"
-            f"Average Horizontal Scale: {average_horizontal_scaling_final:.2f} %\n"
+            f"Average Vertical Scale (MEAN): {avarage_vertical_scale_final:.2f} %\n"
+            f"Average Horizontal Scale (MEAN): {average_horizontal_scaling_final:.2f} %\n"
+            f"Percentage of Horizontal Scale per episode: {avarage_horizontal_scale:.2f} %\n"
+            f"Percentage of Vertical Scale per episode: {avarage_vertical_scale:.2f} %\n"
         )
     save_final_statistics(q_learning_statistics, q_learning_log_path)
     save_q_values(q, q_learning_values_path)
@@ -725,7 +726,7 @@ if __name__ == '__main__':
                                         w_adp, Rmax, rmax_violations_percantage, 
                                         cpu_utilization_percentage, average_cpu_shares_new, 
                                         containers_percentage, avarage_response_time_new, 
-                                        average_horizontal_scaling_final, avarage_vertical_scale_final)
+                                        average_horizontal_scaling_final, avarage_vertical_scale_final, avarage_horizontal_scale, avarage_vertical_scale)
 
     reset_environment_to_initial_state()
     
@@ -734,7 +735,7 @@ if __name__ == '__main__':
         baseline_metrics = run_baseline(num_episodes)
         
         # Extract metrics
-        total_time_per_episode, Rmax_violations, average_cpu_utilization, average_response_time, rmax_violations_percantage, cpu_utilization_percentage, avarage_response_time= baseline_metrics
+        total_time_per_episode, Rmax_violations, average_cpu_utilization, average_response_time, rmax_violations_percantage, cpu_utilization_percentage, avarage_response_time = baseline_metrics
         
         num_iterations = len(costs_per_episode)
         iterations = range(1, num_iterations + 1)
