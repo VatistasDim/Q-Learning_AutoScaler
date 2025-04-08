@@ -490,7 +490,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             rmax_violation_percentage_for_episode = (Rmax_violation_count / steps) * 100
             average_rmax_violations_per_episode.append(rmax_violation_percentage_for_episode)
             
-            avarage_horizontal_scale_for_episode = (horizontal_scaling_count / steps)
+            avarage_horizontal_scale_for_episode = (horizontal_scaling_count / steps)  * 100
             avarage_horizontal_scale_per_episode.append(avarage_horizontal_scale_for_episode)
             
             vertical_scaling_percentage_for_episode = (vertical_scaling_count / steps) * 100
@@ -659,12 +659,12 @@ def create_plots(run_number, iterations):
         plot_metric(iterations, average_cpu_shares, 'Average CPU Shares (%)', 'Average CPU Shares per Episode', f'/app/plots/average_cpu_shares_per_episode_0{run_number}.png')
         plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode', f'/app/plots/average_num_containers_per_episode_0{run_number}.png')
         plot_metric(iterations, average_response_time, 'Average Response Time (s)', 'Average Response Time per Episode', f'/app/plots/average_response_time_per_episode_0{run_number}.png')
-        plot_metric(iterations, avarage_horizontal_scale, 'Average Horizontal Scale (%)', 'Average Horizontal Scale per Episode', f'/app/plots/average_horizontal_scale_per_episode_0{run_number}.png')
-        plot_metric(iterations, avarage_vertical_scale, 'Average Vertical Scale (%)', 'Average Vertical Scale per Episode', f'/app/plots/average_response_time_per_episode_0{run_number}.png')
+        plot_metric(iterations, average_horizontal_scaling_final, 'Average Horizontal Scale (%)', 'Average Horizontal Scale per Episode', f'/app/plots/average_horizontal_scale_per_episode_0{run_number}.png')
+        plot_metric(iterations, avarage_vertical_scale_final, 'Average Vertical Scale (%)', 'Average Vertical Scale per Episode', f'/app/plots/average_response_time_per_episode_0{run_number}.png')
 
 def gather_learning_metrics_and_save(run_number, q, num_episodes, w_perf, w_res, w_adp, Rmax, rmax_violations_percantage, 
                                      cpu_utilization_percentage, average_cpu_shares_new, containers_percentage, 
-                                     avarage_response_time_new, average_horizontal_scaling_final, avarage_vertical_scale_final, avarage_horizontal_scale, avarage_vertical_scale):
+                                     avarage_response_time_new, average_horizontal_scaling_final, avarage_vertical_scale_final):
     q_learning_log_path = f'/logs/q-learning-final-log_{run_number}.txt'
     q_learning_values_path = f'/logs/q-values_{run_number}.npy'
     q_learning_statistics = (
@@ -676,10 +676,8 @@ def gather_learning_metrics_and_save(run_number, q, num_episodes, w_perf, w_res,
             f"Average CPU Shares: {average_cpu_shares_new:.2f}\n"
             f"Average Number of Containers: {containers_percentage:.2f}\n"
             f"Average Response Time: {avarage_response_time_new:.2f} s\n"
-            f"Average Vertical Scale (MEAN): {avarage_vertical_scale_final:.2f} %\n"
-            f"Average Horizontal Scale (MEAN): {average_horizontal_scaling_final:.2f} %\n"
-            f"Percentage of Horizontal Scale per episode: {avarage_horizontal_scale:.2f} %\n"
-            f"Percentage of Vertical Scale per episode: {avarage_vertical_scale:.2f} %\n"
+            f"Average Vertical Scale %: {avarage_vertical_scale_final:.2f} %\n"
+            f"Average Horizontal Scale %: {average_horizontal_scaling_final:.2f} %\n"
         )
     save_final_statistics(q_learning_statistics, q_learning_log_path)
     save_q_values(q, q_learning_values_path)
@@ -727,7 +725,7 @@ if __name__ == '__main__':
                                         w_adp, Rmax, rmax_violations_percantage, 
                                         cpu_utilization_percentage, average_cpu_shares_new, 
                                         containers_percentage, avarage_response_time_new, 
-                                        average_horizontal_scaling_final, avarage_vertical_scale_final, avarage_horizontal_scale, avarage_vertical_scale)
+                                        average_horizontal_scaling_final, avarage_vertical_scale_final)
 
     reset_environment_to_initial_state()
     
