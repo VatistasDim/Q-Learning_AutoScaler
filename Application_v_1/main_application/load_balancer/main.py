@@ -20,6 +20,7 @@ settings_file = 'ApplicationSettings/ApplicationSettings.txt'
 settings = load_settings(settings_file)
 timezone = pytz.timezone('Europe/Athens')
 Rmax = settings.get('Rmax', 0.80)
+num_of_episodes_settings = settings.get('total_episodes', 10)
 seconds_for_next_episode = settings.get('seconds_for_next_episode', 60)
 alpha = settings.get('alpha', 0.1)
 gamma = settings.get('gamma', 0.99)
@@ -703,7 +704,7 @@ if __name__ == '__main__':
         
         reset_environment_to_initial_state()
         
-        num_episodes = 1
+        num_episodes = num_of_episodes_settings
         
         # Initialize Q-table
         Q = np.zeros((len(state_space), len(action_space)))
