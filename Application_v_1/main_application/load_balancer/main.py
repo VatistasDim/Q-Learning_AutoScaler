@@ -370,6 +370,9 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     print("\nLog: Training Starting ...")
     training_start_time = datetime.now()  # Start time of the entire training
 
+    vertical_scaling_steps = 0
+    horizontal_scaling_steps = 0
+
     while episode <= num_episodes:
         print(f'Log: Episode: {episode}')
         app_state = state()
@@ -419,13 +422,17 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             is_vertical_scale, is_horizontal_scale = check_horizontal_or_vertical_scaling(action)
             
+            # Count how many scaling actions total
             if is_horizontal_scale:
                 horizontal_scaling_count += 1
-                print(f'Horizontal scaling occurred: {horizontal_scaling_count}')
-
             if is_vertical_scale:
                 vertical_scaling_count += 1
-                print(f'Vertical scaling occurred: {vertical_scaling_count}')
+
+            # Count how many *steps* had scaling at all
+            if is_horizontal_scale:
+                horizontal_scaling_steps += 1
+            if is_vertical_scale:
+                vertical_scaling_steps += 1
             
             total_actions += 1
             print(f'Log: Response time: {performance_penalty:.2f}s')
@@ -490,11 +497,15 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             rmax_violation_percentage_for_episode = (Rmax_violation_count / steps) * 100
             average_rmax_violations_per_episode.append(rmax_violation_percentage_for_episode)
             
-            avarage_horizontal_scale_for_episode = (horizontal_scaling_count / steps)  * 100
-            avarage_horizontal_scale_per_episode.append(avarage_horizontal_scale_for_episode)
-            
-            vertical_scaling_percentage_for_episode = (vertical_scaling_count / steps) * 100
-            avarage_vertical_scale_per_episode.append(vertical_scaling_percentage_for_episode)
+            # avarage_horizontal_scale_for_episode = (horizontal_scaling_count / steps)  * 100
+            # avarage_horizontal_scale_per_episode.append(avarage_horizontal_scale_for_episode)
+            horizontal_scaling_step_percentage = (horizontal_scaling_steps / steps) * 100
+            vertical_scaling_step_percentage = (vertical_scaling_steps / steps) * 100
+
+            avarage_horizontal_scale_per_episode.append(horizontal_scaling_step_percentage)
+            avarage_vertical_scale_per_episode.append(vertical_scaling_step_percentage)            
+            # vertical_scaling_percentage_for_episode = (vertical_scaling_count / steps) * 100
+            # avarage_vertical_scale_per_episode.append(vertical_scaling_percentage_for_episode)
             
             # Calculate the avarage contaners
             avarage_containers_for_episode = (total_containers / steps)
