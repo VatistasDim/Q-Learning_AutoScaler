@@ -355,8 +355,6 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     total_actions = 0
     total_cpu_shares = 0
     total_response_time = 0
-    vertical_scaling_count = 0
-    horizontal_scaling_count = 0
 
     # Epsilon parameters
     epsilon = epsilon_start  # Start with the initial epsilon value
@@ -386,6 +384,9 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         next_state = app_state
         episode_start_time = datetime.now()  # Start time of the current episode
 
+        vertical_scaling_count = 0
+        horizontal_scaling_count = 0
+        
         while True:
             print("\n")
             current_state = next_state
