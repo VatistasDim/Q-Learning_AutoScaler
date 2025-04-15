@@ -425,9 +425,10 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             # Count how many scaling actions total
             if is_horizontal_scale:
-                horizontal_scaling_count += 1
+                horizontal_scaling_events_this_episode += 1
+
             if is_vertical_scale:
-                vertical_scaling_count += 1
+                vertical_scaling_events_this_episode += 1
 
             # Count how many *steps* had scaling at all
             if is_horizontal_scale:
@@ -478,6 +479,9 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
                 break
 
         if steps > 0:
+            average_vertical_step_size = vertical_scaling_steps / vertical_scaling_count if vertical_scaling_count > 0 else 0
+            average_vertical_step_size = horizontal_scaling_steps / horizontal_scaling_count if horizontal_scaling_count > 0 else 0
+
             costs_per_episode.append(total_cost / steps)
             total_time_per_episode.append(elapsed_time_episode / steps)
             average_cost_per_episode.append(total_reward / steps)
@@ -526,7 +530,8 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
 
         # Decay epsilon after each episode
         epsilon = max(epsilon_end, epsilon * epsilon_decay)
-
+        total_horizontal_scaling_events += horizontal_scaling_events_this_episode
+        total_vertical_scaling_events += vertical_scaling_events_this_episode
         episode += 1
         
     final_average_rmax_violations = sum(average_rmax_violations_per_episode) / len(average_rmax_violations_per_episode)
@@ -534,8 +539,8 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     final_avarage_containers = sum(avarage_containers_per_episode) / len(avarage_containers_per_episode)
     avarage_response_time = (total_response_time / total_actions)
     average_cpu_shares_new = (total_cpu_shares / total_actions)
-    average_horizontal_scaling_final = sum(avarage_horizontal_scale_per_episode) / len(avarage_horizontal_scale_per_episode)
-    avarage_vertical_scale_final = sum(avarage_vertical_scale_per_episode) / len(avarage_vertical_scale_per_episode)
+    average_horizontal_scaling_final = total_horizontal_scaling_events / num_episodes #sum(avarage_horizontal_scale_per_episode) / len(avarage_horizontal_scale_per_episode)
+    avarage_vertical_scale_final = total_vertical_scaling_events / num_episodes #sum(avarage_vertical_scale_per_episode) / len(avarage_vertical_scale_per_episode)
 
     return (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
             average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time,
