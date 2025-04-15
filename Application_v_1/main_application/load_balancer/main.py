@@ -390,6 +390,9 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         horizontal_scaling_events_this_episode = 0
         vertical_scaling_events_this_episode = 0
 
+        total_horizontal_scaling_events = 0
+        total_vertical_scaling_events = 0
+
         while True:
             print("\n")
             current_state = next_state
@@ -482,8 +485,6 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
                 break
 
         if steps > 0:
-            average_vertical_step_size = vertical_scaling_steps / vertical_scaling_count if vertical_scaling_count > 0 else 0
-            average_vertical_step_size = horizontal_scaling_steps / horizontal_scaling_count if horizontal_scaling_count > 0 else 0
 
             costs_per_episode.append(total_cost / steps)
             total_time_per_episode.append(elapsed_time_episode / steps)
