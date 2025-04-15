@@ -432,9 +432,11 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             # Count how many scaling actions total
             if is_horizontal_scale:
                 horizontal_scaling_events_this_episode += 1
+                horizontal_scaling_count += 1
 
             if is_vertical_scale:
                 vertical_scaling_events_this_episode += 1
+                vertical_scaling_count += 1
 
             # Count how many *steps* had scaling at all
             if is_horizontal_scale:
@@ -534,8 +536,8 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
 
         # Decay epsilon after each episode
         epsilon = max(epsilon_end, epsilon * epsilon_decay)
-        total_horizontal_scaling_events += horizontal_scaling_events_this_episode
-        total_vertical_scaling_events += vertical_scaling_events_this_episode
+        total_horizontal_scaling_events += horizontal_scaling_count
+        total_vertical_scaling_events += vertical_scaling_count        
         episode += 1
         
     final_average_rmax_violations = sum(average_rmax_violations_per_episode) / len(average_rmax_violations_per_episode)
