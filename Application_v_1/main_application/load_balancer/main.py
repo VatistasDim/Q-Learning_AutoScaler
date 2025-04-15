@@ -387,6 +387,9 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         vertical_scaling_count = 0
         horizontal_scaling_count = 0
         
+        horizontal_scaling_events_this_episode = 0
+        vertical_scaling_events_this_episode = 0
+
         while True:
             print("\n")
             current_state = next_state
