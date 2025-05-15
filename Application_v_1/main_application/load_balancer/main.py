@@ -748,7 +748,7 @@ if __name__ == '__main__':
         plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode', f'/app/plots/average_num_containers_per_episode_0{i}.png')
         plot_metric(iterations, average_response_time, 'Average Response Time (s)', 'Average Response Time per Episode', f'/app/plots/average_response_time_per_episode_0{i}.png')
         plot_metric(iterations, avarage_horizontal_scale, 'Average Horizontal Scale (mean)', 'Average Horizontal Scale per Episode', f'/app/plots/average_horizontal_scale_per_episode_0{i}.png')
-        plot_metric(iterations, avarage_vertical_scale, 'Average Vertical Scale (mean)', 'Average Vertical Scale per Episode', f'/app/plots/average_response_time_per_episode_0{i}.png')
+        plot_metric(iterations, avarage_vertical_scale, 'Average Vertical Scale (mean)', 'Average Vertical Scale per Episode', f'/app/plots/average_vertial_scale_per_episode_0{i}.png')
 
         # create_plots(run_number= i, iterations=iterations)
         gather_learning_metrics_and_save(i, 
