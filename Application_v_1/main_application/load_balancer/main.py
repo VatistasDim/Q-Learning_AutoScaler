@@ -739,7 +739,18 @@ if __name__ == '__main__':
         iterations = range(1, num_iterations + 1)
         running_time = num_episodes * seconds_for_next_episode / 60
         
-        create_plots(run_number= i, iterations=iterations)
+        plot_metric(iterations, costs_per_episode, 'Total Cost', 'Total Cost per Episode', f'/app/plots/total_cost_per_episode_0{i}.png')
+        plot_metric(iterations, total_time_per_episode, 'Total Time', 'Total Time per Episode', f'/app/plots/total_time_per_episode_0{i}.png')
+        plot_metric(iterations, average_cost_per_episode, 'Average Cost', 'Average Cost per Episode', f'/app/plots/average_cost_per_episode_0{i}.png')
+        plot_metric(iterations, Rmax_violations, 'Rmax Violations (%)', 'Rmax Violations per Episode', f'/app/plots/rmax_violations_per_episode_0{i}.png')
+        plot_metric(iterations, average_cpu_utilization, 'Average CPU Utilization (%)', 'Average CPU Utilization per Episode', f'/app/plots/average_cpu_utilization_per_episode_0{i}.png')
+        plot_metric(iterations, average_cpu_shares, 'Average CPU Shares (%)', 'Average CPU Shares per Episode', f'/app/plots/average_cpu_shares_per_episode_0{i}.png')
+        plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode', f'/app/plots/average_num_containers_per_episode_0{i}.png')
+        plot_metric(iterations, average_response_time, 'Average Response Time (s)', 'Average Response Time per Episode', f'/app/plots/average_response_time_per_episode_0{i}.png')
+        plot_metric(iterations, avarage_horizontal_scale, 'Average Horizontal Scale (mean)', 'Average Horizontal Scale per Episode', f'/app/plots/average_horizontal_scale_per_episode_0{i}.png')
+        plot_metric(iterations, avarage_vertical_scale, 'Average Vertical Scale (mean)', 'Average Vertical Scale per Episode', f'/app/plots/average_response_time_per_episode_0{i}.png')
+
+        # create_plots(run_number= i, iterations=iterations)
         gather_learning_metrics_and_save(i, 
                                         q, 
                                         running_time, 
