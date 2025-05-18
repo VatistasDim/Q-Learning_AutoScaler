@@ -411,7 +411,6 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             performance_penalty = ensure_performance_penalty_has_data(performance_penalty)
             print(f'Log: Perfomance Time: {performance_penalty}')
             total_response_time += performance_penalty
-            print(f'Log: Total response time: {total_response_time}')
             
             a1 = 1 if action in [1, -1] else 0
             a2 = 1 if action in [-512, 512] else 0
@@ -480,7 +479,6 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
 
             print(f"Log: Episode: {episode}, ETA for current episode: {eta_episode_athens}, \nLog: ETA for all episodes: {eta_all_episodes_athens}")
             print(f'Log: Average response time of current episode: {total_response_time / steps:.2f}')
-            print(f'Log: Average response time for all episodes so far: {total_response_time / steps:.2f}')
             print(f"Log: Action: {action}, Horizontal scaling: {is_horizontal_scale}, Vertical scaling: {is_vertical_scale}")
             
             if elapsed_time_episode > seconds_for_next_episode or steps >= 1000:
@@ -615,8 +613,7 @@ def run_baseline(num_episodes):
 
             print(f"\nLog: Episode: {episode}, ETA for current episode: {eta_episode_athens}, \nLog: ETA for all episodes: {eta_all_episodes_athens}")
             print(f'Log: Average response time of current episode: {total_response_time / steps}')
-            print(f'Log: Average response time for all episodes so far: {total_response_time / steps}')
-            
+                        
             total_actions += 1
             
             if elapsed_time_episode > seconds_for_next_episode or steps >= 1000:
@@ -741,12 +738,11 @@ if __name__ == '__main__':
         
         plot_metric(iterations, costs_per_episode, 'Total Cost', 'Total Cost per Episode', f'/app/plots/total_cost_per_episode_0{i}.png')
         plot_metric(iterations, total_time_per_episode, 'Total Time', 'Total Time per Episode', f'/app/plots/total_time_per_episode_0{i}.png')
-        plot_metric(iterations, average_cost_per_episode, 'Average Cost', 'Average Cost per Episode', f'/app/plots/average_cost_per_episode_0{i}.png')
+        plot_metric(iterations, average_cost_per_episode, 'Average Response Time (ms)', 'Average Response Time per Episode', f'/app/plots/average_response_time_per_episode_0{i}.png')
         plot_metric(iterations, Rmax_violations, 'Rmax Violations (%)', 'Rmax Violations per Episode', f'/app/plots/rmax_violations_per_episode_0{i}.png')
         plot_metric(iterations, average_cpu_utilization, 'Average CPU Utilization (%)', 'Average CPU Utilization per Episode', f'/app/plots/average_cpu_utilization_per_episode_0{i}.png')
         plot_metric(iterations, average_cpu_shares, 'Average CPU Shares (%)', 'Average CPU Shares per Episode', f'/app/plots/average_cpu_shares_per_episode_0{i}.png')
         plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode', f'/app/plots/average_num_containers_per_episode_0{i}.png')
-        plot_metric(iterations, average_response_time, 'Average Response Time (s)', 'Average Response Time per Episode', f'/app/plots/average_response_time_per_episode_0{i}.png')
         plot_metric(iterations, avarage_horizontal_scale, 'Average Horizontal Scale (mean)', 'Average Horizontal Scale per Episode', f'/app/plots/average_horizontal_scale_per_episode_0{i}.png')
         plot_metric(iterations, avarage_vertical_scale, 'Average Vertical Scale (mean)', 'Average Vertical Scale per Episode', f'/app/plots/average_vertial_scale_per_episode_0{i}.png')
 
@@ -777,7 +773,6 @@ if __name__ == '__main__':
         plot_metric(iterations, total_time_per_episode, 'Total Time', 'Total Time per Episode (Baseline)', '/app/plots/total_time_per_episode_baseline.png')
         plot_metric(iterations, Rmax_violations, 'Rmax Violations (%)', 'Rmax Violations per Episode (Baseline)', '/app/plots/rmax_violations_per_episode_baseline.png')
         plot_metric(iterations, average_cpu_utilization, 'Average CPU Utilization (%)', 'Average CPU Utilization per Episode (Baseline)', '/app/plots/average_cpu_utilization_per_episode_baseline.png')
-        plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode (Baseline)', '/app/plots/average_num_containers_per_episode_baseline.png')
         plot_metric(iterations, average_response_time, 'Average Response Time (ms)', 'Average Response Time per Episode (Baseline)', '/app/plots/average_response_time_per_episode_baseline.png')
 
         # Prepare final episode statistics for baseline
@@ -785,9 +780,7 @@ if __name__ == '__main__':
             f"Baseline Final Episode Statistics:\n"
             f"Rmax Violations: {Rmax_violations[-1] * 100 / num_episodes:.2f}%\n"
             f"Average CPU Utilization: {average_cpu_utilization[-1]:.2f}%\n"
-            f"Average Number of Containers: {average_num_containers[-1]:.2f}\n"
             f"Average Response Time: {average_response_time[-1]:.2f} ms\n"
-            
         )
 
         # Save final episode statistics for baseline to a log file
