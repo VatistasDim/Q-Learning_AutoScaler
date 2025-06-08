@@ -30,6 +30,8 @@ epsilon_decay = settings.get('epsilon_decay', 0.98)
 cres = 0.01
 wait_time = settings.get('wait_time', 10)
 baseline = settings.get('baseline', True)
+run_with_q = settings.get('run_with_q', True);
+num_of_rows = settings.get('number_of_rows', 1);
 url = settings.get('url', 'http://prometheus:9090/api/v1/query')
 service_name = settings.get('service_name', 'mystack_application')
 max_replicas = settings.get('max_replicas', 10)
@@ -708,59 +710,61 @@ def gather_learning_metrics_and_save(run_number, q, num_episodes, w_perf, w_res,
     
 if __name__ == '__main__':
     
-    file_path = 'Generated_Weights/q_learning_weights.txt'
-    
-    check_and_delete_file(file_path)
-    
-    w_perf_list, w_adp_list, w_res_list = create_file_with_random_weights(file_path, num_rows=20)    
-    
-    length = len(w_perf_list)
-    
-    print("Log: Generated weights:")
-    
-    for i in range(length):
-        print(f"Log: (w_perf): {w_perf_list[i]:.2f}, (w_adp): {w_adp_list[i]:.2f}, (w_res): {w_res_list[i]:.2f}")
-    
-    for i in range(length):
-        
-        reset_environment_to_initial_state()
-        
-        num_episodes = num_of_episodes_settings
-        
-        # Initialize Q-table
-        Q = np.zeros((len(state_space), len(action_space)))
-        q_learning_metrics = run_q_learning(num_episodes, w_perf_list[i], w_adp_list[i], w_res_list[i])     
-        (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
-        average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time,
-        w_adp, w_perf, w_res, rmax_violations_percantage, cpu_utilization_percentage, containers_percentage, avarage_response_time_new, average_cpu_shares_new,
-        average_horizontal_scaling_final, avarage_vertical_scale_final, avarage_horizontal_scale, avarage_vertical_scale, q) = q_learning_metrics
-        
-        num_iterations = len(costs_per_episode)
-        iterations = range(1, num_iterations + 1)
-        running_time = num_episodes * seconds_for_next_episode / 60
-        
-        plot_metric(iterations, costs_per_episode, 'Total Cost', 'Total Cost per Episode', f'/app/plots/total_cost_per_episode_0{i}.png')
-        plot_metric(iterations, total_time_per_episode, 'Total Time', 'Total Time per Episode', f'/app/plots/total_time_per_episode_0{i}.png')
-        plot_metric(iterations, average_cost_per_episode, 'Average Cost', 'Average Cost per Episode', f'/app/plots/average_cost_per_episode_0{i}.png')
-        plot_metric(iterations, Rmax_violations, 'Rmax Violations (%)', 'Rmax Violations per Episode', f'/app/plots/rmax_violations_per_episode_0{i}.png')
-        plot_metric(iterations, average_cpu_utilization, 'Average CPU Utilization (%)', 'Average CPU Utilization per Episode', f'/app/plots/average_cpu_utilization_per_episode_0{i}.png')
-        plot_metric(iterations, average_cpu_shares, 'Average CPU Shares (%)', 'Average CPU Shares per Episode', f'/app/plots/average_cpu_shares_per_episode_0{i}.png')
-        plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode', f'/app/plots/average_num_containers_per_episode_0{i}.png')
-        plot_metric(iterations, average_response_time, 'Average Response Time (s)', 'Average Response Time per Episode', f'/app/plots/average_response_time_per_episode_0{i}.png')
-        plot_metric(iterations, avarage_horizontal_scale, 'Average Horizontal Scale (mean)', 'Average Horizontal Scale per Episode', f'/app/plots/average_horizontal_scale_per_episode_0{i}.png')
-        plot_metric(iterations, avarage_vertical_scale, 'Average Vertical Scale (mean)', 'Average Vertical Scale per Episode', f'/app/plots/average_vertial_scale_per_episode_0{i}.png')
+    if run_with_q:
 
-        # create_plots(run_number= i, iterations=iterations)
-        gather_learning_metrics_and_save(i, 
-                                        q, 
-                                        running_time, 
-                                        w_perf, 
-                                        w_res, 
-                                        w_adp, Rmax, rmax_violations_percantage, 
-                                        cpu_utilization_percentage, average_cpu_shares_new, 
-                                        containers_percentage, avarage_response_time_new, 
-                                        average_horizontal_scaling_final, avarage_vertical_scale_final)
-
+        file_path = 'Generated_Weights/q_learning_weights.txt'
+        
+        check_and_delete_file(file_path)
+        
+        w_perf_list, w_adp_list, w_res_list = create_file_with_random_weights(file_path, num_rows=num_of_rows)    
+        
+        length = len(w_perf_list)
+        
+        print("Log: Generated weights:")
+        
+        for i in range(length):
+            print(f"Log: (w_perf): {w_perf_list[i]:.2f}, (w_adp): {w_adp_list[i]:.2f}, (w_res): {w_res_list[i]:.2f}")
+        
+        for i in range(length):
+            
+            reset_environment_to_initial_state()
+            
+            num_episodes = num_of_episodes_settings
+            
+            # Initialize Q-table
+            Q = np.zeros((len(state_space), len(action_space)))
+            q_learning_metrics = run_q_learning(num_episodes, w_perf_list[i], w_adp_list[i], w_res_list[i])
+            (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
+            average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time,
+            w_adp, w_perf, w_res, rmax_violations_percantage, cpu_utilization_percentage, containers_percentage, avarage_response_time_new, average_cpu_shares_new,
+            average_horizontal_scaling_final, avarage_vertical_scale_final, avarage_horizontal_scale, avarage_vertical_scale, q) = q_learning_metrics
+            
+            num_iterations = len(costs_per_episode)
+            iterations = range(1, num_iterations + 1)
+            running_time = num_episodes * seconds_for_next_episode / 60
+            
+            plot_metric(iterations, costs_per_episode, 'Total Cost', 'Total Cost per Episode', f'/app/plots/total_cost_per_episode_0{i}.png')
+            plot_metric(iterations, total_time_per_episode, 'Total Time', 'Total Time per Episode', f'/app/plots/total_time_per_episode_0{i}.png')
+            plot_metric(iterations, average_cost_per_episode, 'Average Cost', 'Average Cost per Episode', f'/app/plots/average_cost_per_episode_0{i}.png')
+            plot_metric(iterations, Rmax_violations, 'Rmax Violations (%)', 'Rmax Violations per Episode', f'/app/plots/rmax_violations_per_episode_0{i}.png')
+            plot_metric(iterations, average_cpu_utilization, 'Average CPU Utilization (%)', 'Average CPU Utilization per Episode', f'/app/plots/average_cpu_utilization_per_episode_0{i}.png')
+            plot_metric(iterations, average_cpu_shares, 'Average CPU Shares (%)', 'Average CPU Shares per Episode', f'/app/plots/average_cpu_shares_per_episode_0{i}.png')
+            plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode', f'/app/plots/average_num_containers_per_episode_0{i}.png')
+            plot_metric(iterations, average_response_time, 'Average Response Time (s)', 'Average Response Time per Episode', f'/app/plots/average_response_time_per_episode_0{i}.png')
+            plot_metric(iterations, avarage_horizontal_scale, 'Average Horizontal Scale (mean)', 'Average Horizontal Scale per Episode', f'/app/plots/average_horizontal_scale_per_episode_0{i}.png')
+            plot_metric(iterations, avarage_vertical_scale, 'Average Vertical Scale (mean)', 'Average Vertical Scale per Episode', f'/app/plots/average_vertial_scale_per_episode_0{i}.png')
+        
+            # create_plots(run_number= i, iterations=iterations)
+            gather_learning_metrics_and_save(i,
+                                            q,
+                                            running_time, 
+                                            w_perf, 
+                                            w_res, 
+                                            w_adp, Rmax, rmax_violations_percantage, 
+                                            cpu_utilization_percentage, average_cpu_shares_new, 
+                                            containers_percentage, avarage_response_time_new, 
+                                            average_horizontal_scaling_final, avarage_vertical_scale_final)
+        
     reset_environment_to_initial_state()
     
     if baseline:

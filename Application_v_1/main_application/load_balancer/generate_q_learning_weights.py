@@ -15,7 +15,7 @@ def check_and_delete_file(file_path):
     else:
         print(f"File '{file_path}' does not exist.")
 
-def create_file_with_random_weights(file_path, num_rows=20):
+def create_file_with_random_weights(file_path, num_rows):
     """
     Create a .txt file at the specified path and generate random weights.
     Each weight is a float value between 0 and 1, and three weights are 
