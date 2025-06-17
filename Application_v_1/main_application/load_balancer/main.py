@@ -390,7 +390,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
 
         vertical_scaling_count = 0
         horizontal_scaling_count = 0
-        avarage_no_action_count = 0
+        no_scaling_count = 0
         
         horizontal_scaling_events_this_episode = 0
         vertical_scaling_events_this_episode = 0
@@ -437,8 +437,8 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             is_vertical_scale, is_horizontal_scale = check_horizontal_or_vertical_scaling(action)
             
             if not is_horizontal_scale and not is_vertical_scale:
-                no_scaling_steps += 1
-                no_scaling_steps_this_episode += 1
+                no_scaling_events_this_episode += 1
+                no_scaling_count += 1
 
             # Count how many scaling actions total
             if is_horizontal_scale:
@@ -508,7 +508,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             average_num_containers.append(total_containers / steps)
             average_response_time.append(total_response_time / steps)
             avarage_horizontal_scale.append(horizontal_scaling_count / steps)
-            avarage_no_action_per_episode.append(avarage_no_action_count / steps)
+            avarage_no_action_per_episode.append(no_scaling_count / steps)
             avarage_vertical_scale.append(vertical_scaling_count / steps)
             
             # Calculate metrics for cpu utilization
@@ -524,7 +524,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             # avarage_horizontal_scale_per_episode.append(avarage_horizontal_scale_for_episode)
             horizontal_scaling_step_percentage = (horizontal_scaling_events_this_episode / steps) * 100 
             vertical_scaling_step_percentage = (vertical_scaling_events_this_episode / steps) * 100
-            no_action_step_percentage = (no_scaling_steps_this_episode / steps) * 100
+            no_action_step_percentage = (no_scaling_events_this_episode / steps) * 100
 
             avarage_horizontal_scale_per_episode.append(horizontal_scaling_step_percentage)
             avarage_vertical_scale_per_episode.append(vertical_scaling_step_percentage)
