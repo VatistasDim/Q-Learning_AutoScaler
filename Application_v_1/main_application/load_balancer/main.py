@@ -350,6 +350,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     avarage_horizontal_scale = []
     avarage_vertical_scale_per_episode = []
     avarage_horizontal_scale_per_episode = []
+    avarage_no_action_per_episode = []
     avarage_containers_per_episode = []
     average_rmax_violations_per_episode = []
     average_cpu_utilization_per_episode = []
@@ -389,9 +390,11 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
 
         vertical_scaling_count = 0
         horizontal_scaling_count = 0
+        avarage_no_action_count = 0
         
         horizontal_scaling_events_this_episode = 0
         vertical_scaling_events_this_episode = 0
+        no_scaling_steps_this_episode = 0
 
         total_horizontal_scaling_events = 0
         total_vertical_scaling_events = 0
@@ -433,6 +436,10 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             is_vertical_scale, is_horizontal_scale = check_horizontal_or_vertical_scaling(action)
             
+            if not is_horizontal_scale and not is_vertical_scale:
+                no_scaling_steps += 1
+                no_scaling_steps_this_episode += 1
+
             # Count how many scaling actions total
             if is_horizontal_scale:
                 horizontal_scaling_events_this_episode += 1
@@ -501,6 +508,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             average_num_containers.append(total_containers / steps)
             average_response_time.append(total_response_time / steps)
             avarage_horizontal_scale.append(horizontal_scaling_count / steps)
+            avarage_no_action_per_episode.append(avarage_no_action_count / steps)
             avarage_vertical_scale.append(vertical_scaling_count / steps)
             
             # Calculate metrics for cpu utilization
@@ -516,9 +524,11 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             # avarage_horizontal_scale_per_episode.append(avarage_horizontal_scale_for_episode)
             horizontal_scaling_step_percentage = (horizontal_scaling_events_this_episode / steps) * 100 
             vertical_scaling_step_percentage = (vertical_scaling_events_this_episode / steps) * 100
+            no_action_step_percentage = (no_scaling_steps_this_episode / steps) * 100
 
             avarage_horizontal_scale_per_episode.append(horizontal_scaling_step_percentage)
-            avarage_vertical_scale_per_episode.append(vertical_scaling_step_percentage)            
+            avarage_vertical_scale_per_episode.append(vertical_scaling_step_percentage)
+            avarage_no_action_per_episode.append(no_action_step_percentage)
             # vertical_scaling_percentage_for_episode = (vertical_scaling_count / steps) * 100
             # avarage_vertical_scale_per_episode.append(vertical_scaling_percentage_for_episode)
             
@@ -551,11 +561,12 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     average_cpu_shares_new = (total_cpu_shares / total_actions)
     average_horizontal_scaling_final = sum(avarage_horizontal_scale_per_episode) / len(avarage_horizontal_scale_per_episode)
     avarage_vertical_scale_final = sum(avarage_vertical_scale_per_episode) / len(avarage_vertical_scale_per_episode)
+    avarage_no_action_final = sum(avarage_no_action_per_episode) / len(avarage_no_action_per_episode)
 
     return (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
             average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time,
             w_adp, w_perf, w_res, final_average_rmax_violations, final_average_cpu_utilization, final_avarage_containers, avarage_response_time, average_cpu_shares_new,
-            average_horizontal_scaling_final, avarage_vertical_scale_final, avarage_horizontal_scale, avarage_vertical_scale, Q)
+            average_horizontal_scaling_final, avarage_vertical_scale_final, avarage_horizontal_scale, avarage_vertical_scale, Q, avarage_no_action_final)
     
 def run_baseline(num_episodes):
     episode = 1
@@ -691,7 +702,7 @@ def create_plots(run_number, iterations):
 
 def gather_learning_metrics_and_save(run_number, q, num_episodes, w_perf, w_res, w_adp, Rmax, rmax_violations_percantage, 
                                      cpu_utilization_percentage, average_cpu_shares_new, containers_percentage, 
-                                     avarage_response_time_new, average_horizontal_scaling_final, avarage_vertical_scale_final):
+                                     avarage_response_time_new, average_horizontal_scaling_final, avarage_vertical_scale_final, no_action_final):
     q_learning_log_path = f'/logs/q-learning-final-log_{run_number}.txt'
     q_learning_values_path = f'/logs/q-values_{run_number}.npy'
     q_learning_statistics = (
@@ -705,6 +716,7 @@ def gather_learning_metrics_and_save(run_number, q, num_episodes, w_perf, w_res,
             f"Average Response Time: {avarage_response_time_new:.2f} s\n"
             f"Average Vertical Scale %: {avarage_vertical_scale_final:.2f} %\n"
             f"Average Horizontal Scale %: {average_horizontal_scaling_final:.2f} %\n"
+            f"Average No Action %: {no_action_final:.2f} %\n"
         )
     save_final_statistics(q_learning_statistics, q_learning_log_path)
     save_q_values(q, q_learning_values_path)
@@ -739,7 +751,7 @@ if __name__ == '__main__':
             (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
             average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time,
             w_adp, w_perf, w_res, rmax_violations_percantage, cpu_utilization_percentage, containers_percentage, avarage_response_time_new, average_cpu_shares_new,
-            average_horizontal_scaling_final, avarage_vertical_scale_final, avarage_horizontal_scale, avarage_vertical_scale, q) = q_learning_metrics
+            average_horizontal_scaling_final, avarage_vertical_scale_final, avarage_horizontal_scale, avarage_vertical_scale, q, no_action_metric) = q_learning_metrics
             
             num_iterations = len(costs_per_episode)
             iterations = range(1, num_iterations + 1)
@@ -765,7 +777,7 @@ if __name__ == '__main__':
                                             w_adp, Rmax, rmax_violations_percantage, 
                                             cpu_utilization_percentage, average_cpu_shares_new, 
                                             containers_percentage, avarage_response_time_new, 
-                                            average_horizontal_scaling_final, avarage_vertical_scale_final)
+                                            average_horizontal_scaling_final, avarage_vertical_scale_final, no_action_metric)
         
     reset_environment_to_initial_state()
     
