@@ -394,7 +394,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         
         horizontal_scaling_events_this_episode = 0
         vertical_scaling_events_this_episode = 0
-        no_scaling_steps_this_episode = 0
+        no_scaling_events_this_episode = 0
 
         total_horizontal_scaling_events = 0
         total_vertical_scaling_events = 0
