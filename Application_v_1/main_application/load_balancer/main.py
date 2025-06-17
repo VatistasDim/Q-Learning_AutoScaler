@@ -354,6 +354,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     avarage_containers_per_episode = []
     average_rmax_violations_per_episode = []
     average_cpu_utilization_per_episode = []
+    valid_actions = [-1, 0, 1, -512, 512]
     
     total_actions = 0
     total_cpu_shares = 0
@@ -425,6 +426,10 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             cost = Costs.overall_cost_function(w_adp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)
             
+
+            if action not in valid_actions:
+                print(f"[WARNING] Unknown action detected: {action}")
+
             total_cost += cost
             print(f'Log: Cost: {cost}, action: {action}')
             
