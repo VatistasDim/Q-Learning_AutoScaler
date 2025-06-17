@@ -373,6 +373,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     vertical_scaling_steps = 0
     horizontal_scaling_steps = 0
 
+    # TODO: Change the episodes to time episodes. (Make simulation time e.g. Make it in time 10 min run or 5 min run.)
     while episode <= num_episodes:
         print(f'Log: Episode: {episode}')
         app_state = state()
@@ -396,6 +397,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         total_vertical_scaling_events = 0
 
         while True:
+            # TODO: Change the epsilon greedy policy here. We need to do it in e/i where i is the time of simulation.
             print("\n")
             current_state = next_state
             nearest_state = find_nearest_state(current_state, state_space)
@@ -537,7 +539,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             avarage_vertical_scale.append(0)
 
         # Decay epsilon after each episode
-        epsilon = max(epsilon_end, epsilon * epsilon_decay)
+        epsilon = 1 / episode
         total_horizontal_scaling_events += horizontal_scaling_count
         total_vertical_scaling_events += vertical_scaling_count
         episode += 1
@@ -710,6 +712,8 @@ def gather_learning_metrics_and_save(run_number, q, num_episodes, w_perf, w_res,
     
 if __name__ == '__main__':
     
+    num_episodes = num_of_episodes_settings
+
     if run_with_q:
 
         file_path = 'Generated_Weights/q_learning_weights.txt'
@@ -728,8 +732,6 @@ if __name__ == '__main__':
         for i in range(length):
             
             reset_environment_to_initial_state()
-            
-            num_episodes = num_of_episodes_settings
             
             # Initialize Q-table
             Q = np.zeros((len(state_space), len(action_space)))
@@ -774,14 +776,13 @@ if __name__ == '__main__':
         # Extract metrics
         total_time_per_episode, Rmax_violations, average_cpu_utilization, average_response_time, rmax_violations_percantage, cpu_utilization_percentage, avarage_response_time = baseline_metrics
         
-        num_iterations = len(costs_per_episode)
+        num_iterations = num_episodes
         iterations = range(1, num_iterations + 1)
         
         # Plot and save baseline results
         plot_metric(iterations, total_time_per_episode, 'Total Time', 'Total Time per Episode (Baseline)', '/app/plots/total_time_per_episode_baseline.png')
         plot_metric(iterations, Rmax_violations, 'Rmax Violations (%)', 'Rmax Violations per Episode (Baseline)', '/app/plots/rmax_violations_per_episode_baseline.png')
         plot_metric(iterations, average_cpu_utilization, 'Average CPU Utilization (%)', 'Average CPU Utilization per Episode (Baseline)', '/app/plots/average_cpu_utilization_per_episode_baseline.png')
-        plot_metric(iterations, average_num_containers, 'Average Number of Containers', 'Average Number of Containers per Episode (Baseline)', '/app/plots/average_num_containers_per_episode_baseline.png')
         plot_metric(iterations, average_response_time, 'Average Response Time (ms)', 'Average Response Time per Episode (Baseline)', '/app/plots/average_response_time_per_episode_baseline.png')
 
         # Prepare final episode statistics for baseline
@@ -789,9 +790,7 @@ if __name__ == '__main__':
             f"Baseline Final Episode Statistics:\n"
             f"Rmax Violations: {Rmax_violations[-1] * 100 / num_episodes:.2f}%\n"
             f"Average CPU Utilization: {average_cpu_utilization[-1]:.2f}%\n"
-            f"Average Number of Containers: {average_num_containers[-1]:.2f}\n"
             f"Average Response Time: {average_response_time[-1]:.2f} ms\n"
-            
         )
 
         # Save final episode statistics for baseline to a log file
