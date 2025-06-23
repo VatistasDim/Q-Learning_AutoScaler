@@ -203,61 +203,56 @@ def get_node_resources(node_id):
 def set_cpu_shares(service_name, cpu_shares):
     client = docker.from_env()
     retry_attempts = 5
+    wait_time = 3
 
     for attempt in range(retry_attempts):
         try:
             print(f"Log: Attempting to set CPU shares to {cpu_shares}")
             service = client.services.get(service_name)
-            service_tasks = service.tasks()
-
-            if not service_tasks:
-                print("Error: No tasks found for the service")
-                return False
-
-            node_id = service_tasks[0]['NodeID']
-            node_nano_cpus, _ = get_node_resources(node_id)
-            if node_nano_cpus is None:
-                print("Error: Could not retrieve node CPU resources.")
-                return False
 
             desired_cpu_nano = int(cpu_shares * 1_000_000_000)
-            if desired_cpu_nano > node_nano_cpus:
-                print("Error: Not enough available CPU resources.")
-                return False
 
-            # Load current spec details
+            # Extract existing spec components
             spec = service.attrs['Spec']
-
-            # Get the TaskTemplate object
             task_template = spec['TaskTemplate']
+            container_spec = task_template.get('ContainerSpec', {})
             resources = task_template.get('Resources', {})
-            limits = resources.get('Limits', {})
+            restart_policy = task_template.get('RestartPolicy')
+            placement = task_template.get('Placement')
+            log_driver = task_template.get('LogDriver')
+            force_update = task_template.get('ForceUpdate', 0)
 
-            # Update the CPU limit
-            limits['NanoCPUs'] = desired_cpu_nano
-            resources['Limits'] = limits
-            task_template['Resources'] = resources
+            # Update CPU limits
+            if 'Limits' not in resources:
+                resources['Limits'] = {}
+            resources['Limits']['NanoCPUs'] = desired_cpu_nano
 
-            # Collect other necessary parts of the spec
+            # Optional metadata
             name = spec['Name']
-            labels = spec.get('Labels', {})
             mode = spec['Mode']
+            labels = spec.get('Labels', {})
+            networks = spec.get('Networks')
             update_config = spec.get('UpdateConfig')
             rollback_config = spec.get('RollbackConfig')
             endpoint_spec = spec.get('EndpointSpec')
-            networks = spec.get('Networks')
-            task_template['ContainerSpec'] = task_template.get('ContainerSpec')
 
-            # Update the service with modified pieces
+            # Update service
             service.update(
                 name=name,
-                labels=labels,
+                task_template={
+                    'ContainerSpec': container_spec,
+                    'Resources': resources,
+                    'RestartPolicy': restart_policy,
+                    'Placement': placement,
+                    'LogDriver': log_driver,
+                    'ForceUpdate': force_update
+                },
                 mode=mode,
+                labels=labels,
+                networks=networks,
                 update_config=update_config,
                 rollback_config=rollback_config,
-                task_template=task_template,
-                endpoint_spec=endpoint_spec,
-                networks=networks
+                endpoint_spec=endpoint_spec
             )
 
             print(f"Success: CPU shares updated to {desired_cpu_nano} NanoCPUs.")
@@ -265,10 +260,10 @@ def set_cpu_shares(service_name, cpu_shares):
             return True
 
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Error during attempt {attempt + 1}: {e}")
             time.sleep(wait_time)
 
-    print("Error: Failed to set CPU shares after multiple attempts.")
+    print("Error: Failed to update CPU shares after multiple attempts.")
     return False
 
 
