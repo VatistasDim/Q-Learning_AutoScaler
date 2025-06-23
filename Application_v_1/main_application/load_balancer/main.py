@@ -225,16 +225,41 @@ def set_cpu_shares(service_name, cpu_shares):
                 print("Error: Not enough available CPU resources.")
                 return False
 
-            # Build the update payload
-            task_template = service.attrs['Spec']['TaskTemplate']
-            if 'Resources' not in task_template:
-                task_template['Resources'] = {}
-            if 'Limits' not in task_template['Resources']:
-                task_template['Resources']['Limits'] = {}
+            # Load current spec details
+            spec = service.attrs['Spec']
 
-            task_template['Resources']['Limits']['NanoCPUs'] = desired_cpu_nano
+            # Get the TaskTemplate object
+            task_template = spec['TaskTemplate']
+            resources = task_template.get('Resources', {})
+            limits = resources.get('Limits', {})
 
-            service.update(task_template=task_template)
+            # Update the CPU limit
+            limits['NanoCPUs'] = desired_cpu_nano
+            resources['Limits'] = limits
+            task_template['Resources'] = resources
+
+            # Collect other necessary parts of the spec
+            name = spec['Name']
+            labels = spec.get('Labels', {})
+            mode = spec['Mode']
+            update_config = spec.get('UpdateConfig')
+            rollback_config = spec.get('RollbackConfig')
+            endpoint_spec = spec.get('EndpointSpec')
+            networks = spec.get('Networks')
+            task_template['ContainerSpec'] = task_template.get('ContainerSpec')
+
+            # Update the service with modified pieces
+            service.update(
+                name=name,
+                labels=labels,
+                mode=mode,
+                update_config=update_config,
+                rollback_config=rollback_config,
+                task_template=task_template,
+                endpoint_spec=endpoint_spec,
+                networks=networks
+            )
+
             print(f"Success: CPU shares updated to {desired_cpu_nano} NanoCPUs.")
             time.sleep(wait_time)
             return True
