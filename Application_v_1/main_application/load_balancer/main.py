@@ -37,6 +37,7 @@ service_name = settings.get('service_name', 'mystack_application')
 max_replicas = settings.get('max_replicas', 10)
 min_replicas = settings.get('min_replicas', 1)
 max_containers = settings.get('max_containers', 11)
+CPU_LEVELS = [0.5, 1.0, 1.5, 2.0]
 
 print(f'Rmax: {Rmax}')
 print(f'seconds_for_next_episode: {seconds_for_next_episode}')
@@ -71,7 +72,7 @@ iteration = 1
 def reset_environment_to_initial_state():
     print("Log: Resetting the environemnt")
     scale_out(service_name=service_name, desired_replicas=1)
-    set_cpu_shares(service_name, 2.0)
+    set_cpu_shares(service_name, 1.0)
 
 def transition(action):
     global was_transition_succefull
@@ -104,20 +105,36 @@ def transition(action):
 
 def increase_cpu_share_step(current_cpu_share):
     print(f'Log: increase_cpu_share_step --> current_cpu_share:{current_cpu_share}')
-    if current_cpu_share == 1:
-        set_cpu_shares(service_name, 2.0)
-        return True
-    elif current_cpu_share == 2:
-        print(f"Log: No Increase, already at max cpu shares")
+
+    try:
+        idx = CPU_LEVELS.index(current_cpu_share)
+        if idx + 1 <= 2:
+            desired_cpu_share = CPU_LEVELS[idx + 1]
+            set_cpu_shares(service_name, desired_cpu_share)
+            return True
+        else:
+            print("Log: No Increase in CPU shares, already at maximum level, Decreasing by one")
+            desired_cpu_share = CPU_LEVELS[idx - 1]
+            set_cpu_shares(service_name, desired_cpu_share)
+            return False
+    except ValueError:
+        print(f"Error: Current CPU share {current_cpu_share} is not in CPU_LEVELS.")
         return False
 
 def decrease_cpu_share_step(current_cpu_share):
-    print(f'Log: decrease_cpu_share_step --> current_cpu_share:{current_cpu_share}')
-    if current_cpu_share == 2:
-        set_cpu_shares(service_name, 1.0)
-        return True
-    elif current_cpu_share == 1:
-        print("Log: No decrease in cpu shares, already at lowest cpu shares")
+    print(f'Log: decrease_cpu_share_step --> current_cpu_share: {current_cpu_share}')
+    
+    try:
+        idx = CPU_LEVELS.index(current_cpu_share)
+        if idx - 1 >= 0:
+            desired_cpu_share = CPU_LEVELS[idx - 1]
+            set_cpu_shares(service_name, desired_cpu_share)
+            return True
+        else:
+            print("Log: No decrease in CPU shares, already at lowest level")
+            return False
+    except ValueError:
+        print(f"Error: Current CPU share {current_cpu_share} is not in CPU_LEVELS.")
         return False
 
 def select_action(Q, state, epsilon):
@@ -186,60 +203,53 @@ def get_node_resources(node_id):
 def set_cpu_shares(service_name, cpu_shares):
     client = docker.from_env()
     retry_attempts = 5
+
     for attempt in range(retry_attempts):
         try:
-            print("Log: Setting CPU shares")
+            print(f"Log: Attempting to set CPU shares to {cpu_shares}")
             service = client.services.get(service_name)
             service_tasks = service.tasks()
 
             if not service_tasks:
                 print("Error: No tasks found for the service")
-                return
+                return False
 
             node_id = service_tasks[0]['NodeID']
             node_nano_cpus, node_memory_bytes = get_node_resources(node_id)
 
-            if node_nano_cpus is None or node_memory_bytes is None:
-                print("Error: Could not get node resources")
-                return
+            if node_nano_cpus is None:
+                print("Error: Could not retrieve node CPU resources.")
+                return False
 
-            print(f'Log: Node Nano CPUs: {node_nano_cpus}, Node Memory Bytes: {node_memory_bytes}')
+            desired_cpu_nano = int(cpu_shares * 1_000_000_000)
+            if desired_cpu_nano > node_nano_cpus:
+                print("Error: Not enough available CPU resources.")
+                return False
 
-            resources = service.attrs['Spec']['TaskTemplate']['Resources']
-            if 'Limits' not in resources:
-                resources['Limits'] = {}
+            spec = service.attrs['Spec']
+            task_template = spec['TaskTemplate']
+            resources = task_template.get('Resources', {})
+            limits = resources.get('Limits', {})
 
-            current_cpu_shares = resources['Limits'].get('NanoCPUs', 0)
-            print(f'Log: Current CPU Shares: {current_cpu_shares} NanoCPUs')
+            print(f"Log: Current NanoCPUs = {limits.get('NanoCPUs', 0)}")
 
-            desired_cpu_shares_nano = int(cpu_shares * 1_000_000_000)
-            print(f'Log: Desired CPU Shares: {desired_cpu_shares_nano} NanoCPUs')
+            # Update the CPU limit
+            limits['NanoCPUs'] = desired_cpu_nano
+            resources['Limits'] = limits
+            task_template['Resources'] = resources
+            spec['TaskTemplate'] = task_template
 
-            if desired_cpu_shares_nano > node_nano_cpus:
-                print("Error: Not enough CPU resources available")
-                return
-
-            resources['Limits']['NanoCPUs'] = desired_cpu_shares_nano
-            service.update(resources=resources)
-            print(f"Log: CPU shares set to {desired_cpu_shares_nano} NanoCPUs for service {service_name}")
+            service.update(**spec)
+            print(f"Success: CPU shares updated to {desired_cpu_nano} NanoCPUs.")
             time.sleep(wait_time)
-            break  # Exit the loop if successful
-        except KeyError as e:
-            if 'NodeID' in str(e):
-                print(f"Warning: 'NodeID' not found in service task on attempt {attempt + 1}. Retrying in {wait_time} seconds...")
-                time.sleep(wait_time)
-            else:
-                print(f"Error: Unexpected KeyError: {e}")
-                break
-        except docker.errors.NotFound:
-            print("Error: Service not found. Cannot increase CPU shares.")
-            break
-        except Exception as e:
-            print(f"Error: An unexpected error occurred: {e}")
-            break
-    else:
-        print("Error: Failed to set CPU shares after multiple attempts.")
+            return True
 
+        except Exception as e:
+            print(f"Error: {e}")
+            time.sleep(wait_time)
+
+    print("Error: Failed to set CPU shares after multiple attempts.")
+    return False
 def get_current_replica_count(service_prefix):
     client = docker.from_env()
     try:
@@ -259,7 +269,8 @@ def scale_out(service_name, desired_replicas):
         time.sleep(wait_time)
         return True
     else:
-        print("Log: Maximum containers reached, transition not possible.")
+        scale_in(service_name, 1)
+        print("Log: Maximum containers reached, transition not possible. Removing Container")
         return False
 
 def scale_in(service_name, scale_out_factor):
@@ -429,7 +440,6 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             a2 = 1 if action in [-512, 512] else 0
             
             cost = Costs.overall_cost_function(w_adp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)
-            
 
             if action not in valid_actions:
                 print(f"[WARNING] Unknown action detected: {action}")

@@ -1,4 +1,4 @@
-num_episodes = 80; 
+total_episodes = 120; 
 seconds_for_next_episode; 
 alpha = 0.1; 
 gamma = 0.99; 
