@@ -215,8 +215,7 @@ def set_cpu_shares(service_name, cpu_shares):
                 return False
 
             node_id = service_tasks[0]['NodeID']
-            node_nano_cpus, node_memory_bytes = get_node_resources(node_id)
-
+            node_nano_cpus, _ = get_node_resources(node_id)
             if node_nano_cpus is None:
                 print("Error: Could not retrieve node CPU resources.")
                 return False
@@ -226,20 +225,16 @@ def set_cpu_shares(service_name, cpu_shares):
                 print("Error: Not enough available CPU resources.")
                 return False
 
-            spec = service.attrs['Spec']
-            task_template = spec['TaskTemplate']
-            resources = task_template.get('Resources', {})
-            limits = resources.get('Limits', {})
+            # Build the update payload
+            task_template = service.attrs['Spec']['TaskTemplate']
+            if 'Resources' not in task_template:
+                task_template['Resources'] = {}
+            if 'Limits' not in task_template['Resources']:
+                task_template['Resources']['Limits'] = {}
 
-            print(f"Log: Current NanoCPUs = {limits.get('NanoCPUs', 0)}")
+            task_template['Resources']['Limits']['NanoCPUs'] = desired_cpu_nano
 
-            # Update the CPU limit
-            limits['NanoCPUs'] = desired_cpu_nano
-            resources['Limits'] = limits
-            task_template['Resources'] = resources
-            spec['TaskTemplate'] = task_template
-
-            service.update(**spec)
+            service.update(task_template=task_template)
             print(f"Success: CPU shares updated to {desired_cpu_nano} NanoCPUs.")
             time.sleep(wait_time)
             return True
@@ -250,6 +245,8 @@ def set_cpu_shares(service_name, cpu_shares):
 
     print("Error: Failed to set CPU shares after multiple attempts.")
     return False
+
+
 def get_current_replica_count(service_prefix):
     client = docker.from_env()
     try:
