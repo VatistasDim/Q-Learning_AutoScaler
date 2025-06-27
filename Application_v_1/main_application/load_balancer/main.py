@@ -72,7 +72,7 @@ iteration = 1
 def reset_environment_to_initial_state():
     print("Log: Resetting the environemnt")
     scale_out(service_name=service_name, desired_replicas=1)
-    set_cpu_shares(service_name, 1.0)s
+    set_cpu_shares(service_name, 1.0)
 
 def transition(action):
     global was_transition_succefull
