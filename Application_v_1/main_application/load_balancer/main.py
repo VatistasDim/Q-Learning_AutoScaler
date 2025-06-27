@@ -72,7 +72,7 @@ iteration = 1
 def reset_environment_to_initial_state():
     print("Log: Resetting the environemnt")
     scale_out(service_name=service_name, desired_replicas=1)
-    set_cpu_shares(service_name, 1.0)
+    set_cpu_shares(service_name, 1.0)s
 
 def transition(action):
     global was_transition_succefull
@@ -103,39 +103,31 @@ def transition(action):
     print(f"Log: New CPU shares after action: {new_cpu_shares}")
     return (c, u, k)
 
-def increase_cpu_share_step(current_cpu_share):
-    print(f'Log: increase_cpu_share_step --> current_cpu_share:{current_cpu_share}')
+def increase_cpu_share_step(current_cpu_share, service_name):
+    print(f'Log: increase_cpu_share_step --> current_cpu_share: {current_cpu_share}')
 
-    try:
-        idx = CPU_LEVELS.index(current_cpu_share)
-        if idx + 1 <= 2:
-            desired_cpu_share = CPU_LEVELS[idx + 1]
-            set_cpu_shares(service_name, desired_cpu_share)
-            return True
-        else:
-            print("Log: No Increase in CPU shares, already at maximum level, Decreasing by one")
-            desired_cpu_share = CPU_LEVELS[idx - 1]
-            set_cpu_shares(service_name, desired_cpu_share)
-            return False
-    except ValueError:
-        print(f"Error: Current CPU share {current_cpu_share} is not in CPU_LEVELS.")
+    desired_cpu_share = min(2.0, current_cpu_share + 0.5)
+
+    if desired_cpu_share == current_cpu_share:
+        print("Log: No increase in CPU shares, already at maximum level 2.0")
         return False
 
-def decrease_cpu_share_step(current_cpu_share):
+    set_cpu_shares(service_name, desired_cpu_share)
+    print(f"Log: CPU shares increased to {desired_cpu_share}")
+    return True
+
+def decrease_cpu_share_step(current_cpu_share, service_name):
     print(f'Log: decrease_cpu_share_step --> current_cpu_share: {current_cpu_share}')
     
-    try:
-        idx = CPU_LEVELS.index(current_cpu_share)
-        if idx - 1 >= 0:
-            desired_cpu_share = CPU_LEVELS[idx - 1]
-            set_cpu_shares(service_name, desired_cpu_share)
-            return True
-        else:
-            print("Log: No decrease in CPU shares, already at lowest level")
-            return False
-    except ValueError:
-        print(f"Error: Current CPU share {current_cpu_share} is not in CPU_LEVELS.")
+    desired_cpu_share = max(0.5, current_cpu_share - 0.5)
+    
+    if desired_cpu_share == current_cpu_share:
+        print("Log: No decrease in CPU shares, already at lowest level 0.5")
         return False
+    
+    set_cpu_shares(service_name, desired_cpu_share)
+    print(f"Log: CPU shares decreased to {desired_cpu_share}")
+    return True
 
 def select_action(Q, state, epsilon):
     if np.random.uniform(0, 1) < epsilon:
@@ -184,7 +176,7 @@ def get_current_cpu_shares(service_name):
     try:
         service = client.services.get(service_name)
         resources = service.attrs['Spec']['TaskTemplate']['Resources']
-        cpu_current_shares = resources.get('Limits', {}).get('NanoCPUs', 0) // 1_000_000_000
+        cpu_current_shares = resources.get('Limits', {}).get('NanoCPUs', 0) / 1_000_000_000
         return cpu_current_shares
     except docker.errors.NotFound:
         print("Error: Service not found")
@@ -203,69 +195,59 @@ def get_node_resources(node_id):
 def set_cpu_shares(service_name, cpu_shares):
     client = docker.from_env()
     retry_attempts = 5
-    wait_time = 3
-
     for attempt in range(retry_attempts):
         try:
-            print(f"Log: Attempting to set CPU shares to {cpu_shares}")
+            print("Log: Setting CPU shares")
             service = client.services.get(service_name)
+            service_tasks = service.tasks()
 
-            desired_cpu_nano = int(cpu_shares * 1_000_000_000)
+            if not service_tasks:
+                print("Error: No tasks found for the service")
+                return
 
-            # Extract existing spec components
-            spec = service.attrs['Spec']
-            task_template = spec['TaskTemplate']
-            container_spec = task_template.get('ContainerSpec', {})
-            resources = task_template.get('Resources', {})
-            restart_policy = task_template.get('RestartPolicy')
-            placement = task_template.get('Placement')
-            log_driver = task_template.get('LogDriver')
-            force_update = task_template.get('ForceUpdate', 0)
+            node_id = service_tasks[0]['NodeID']
+            node_nano_cpus, node_memory_bytes = get_node_resources(node_id)
 
-            # Update CPU limits
+            if node_nano_cpus is None or node_memory_bytes is None:
+                print("Error: Could not get node resources")
+                return
+
+            print(f'Log: Node Nano CPUs: {node_nano_cpus}, Node Memory Bytes: {node_memory_bytes}')
+
+            resources = service.attrs['Spec']['TaskTemplate']['Resources']
             if 'Limits' not in resources:
                 resources['Limits'] = {}
-            resources['Limits']['NanoCPUs'] = desired_cpu_nano
 
-            # Optional metadata
-            name = spec['Name']
-            mode = spec['Mode']
-            labels = spec.get('Labels', {})
-            networks = spec.get('Networks')
-            update_config = spec.get('UpdateConfig')
-            rollback_config = spec.get('RollbackConfig')
-            endpoint_spec = spec.get('EndpointSpec')
+            current_cpu_shares = resources['Limits'].get('NanoCPUs', 0)
+            print(f'Log: Current CPU Shares: {current_cpu_shares} NanoCPUs')
 
-            # Update service
-            service.update(
-                name=name,
-                task_template={
-                    'ContainerSpec': container_spec,
-                    'Resources': resources,
-                    'RestartPolicy': restart_policy,
-                    'Placement': placement,
-                    'LogDriver': log_driver,
-                    'ForceUpdate': force_update
-                },
-                mode=mode,
-                labels=labels,
-                networks=networks,
-                update_config=update_config,
-                rollback_config=rollback_config,
-                endpoint_spec=endpoint_spec
-            )
+            desired_cpu_shares_nano = int(cpu_shares * 1_000_000_000)
+            print(f'Log: Desired CPU Shares: {desired_cpu_shares_nano} NanoCPUs')
 
-            print(f"Success: CPU shares updated to {desired_cpu_nano} NanoCPUs.")
+            if desired_cpu_shares_nano > node_nano_cpus:
+                print("Error: Not enough CPU resources available")
+                return
+
+            resources['Limits']['NanoCPUs'] = desired_cpu_shares_nano
+            service.update(resources=resources)
+            print(f"Log: CPU shares set to {desired_cpu_shares_nano} NanoCPUs for service {service_name}")
             time.sleep(wait_time)
-            return True
-
+            break  # Exit the loop if successful
+        except KeyError as e:
+            if 'NodeID' in str(e):
+                print(f"Warning: 'NodeID' not found in service task on attempt {attempt + 1}. Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+            else:
+                print(f"Error: Unexpected KeyError: {e}")
+                break
+        except docker.errors.NotFound:
+            print("Error: Service not found. Cannot increase CPU shares.")
+            break
         except Exception as e:
-            print(f"Error during attempt {attempt + 1}: {e}")
-            time.sleep(wait_time)
-
-    print("Error: Failed to update CPU shares after multiple attempts.")
-    return False
-
+            print(f"Error: An unexpected error occurred: {e}")
+            break
+    else:
+        print("Error: Failed to set CPU shares after multiple attempts.")
 
 def get_current_replica_count(service_prefix):
     client = docker.from_env()
