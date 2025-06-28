@@ -1,3 +1,4 @@
+from docker.models.services import Service
 import numpy as np
 import prometheus_metrics
 import matplotlib.pyplot as plt
@@ -89,10 +90,10 @@ def transition(action):
         was_transition_succefull = scale_out(service_name=service_name, desired_replicas=desired_replicas)
     elif action == -512:  # Decrease CPU shares
         print("Log: Decrease CPU shares")
-        was_transition_succefull = decrease_cpu_share_step(current_cpu_share=current_cpu_shares)
+        was_transition_succefull = decrease_cpu_share_step(current_cpu_share=current_cpu_shares, service_name=service_name)
     elif action == 512:  # Increase CPU shares
         print("Log: Increase CPU shares")
-        was_transition_succefull = increase_cpu_share_step(current_cpu_share=current_cpu_shares)
+        was_transition_succefull = increase_cpu_share_step(current_cpu_share=current_cpu_shares, service_name=service_name)
     elif action == 0:
         print("Log: No Action")
         time.sleep(5)
@@ -109,7 +110,8 @@ def increase_cpu_share_step(current_cpu_share, service_name):
     desired_cpu_share = min(2.0, current_cpu_share + 0.5)
 
     if desired_cpu_share == current_cpu_share:
-        print("Log: No increase in CPU shares, already at maximum level 2.0")
+        print("Log: No increase in CPU shares, already at maximum level 2.0. Reducing 0.5 CPU Shares")
+        set_cpu_shares(service_name, desired_cpu_share - 0.5)
         return False
 
     set_cpu_shares(service_name, desired_cpu_share)
