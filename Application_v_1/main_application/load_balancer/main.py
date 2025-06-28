@@ -560,7 +560,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             avarage_containers_for_episode = (total_containers / steps)
             avarage_response_time_for_episode = (total_response_time / steps)
             avarage_containers_per_episode.append(avarage_containers_for_episode)
-            avarage_response_time_for_episode.append(avarage_response_time_for_episode)
+            avarage_response_time_per_episode.append(avarage_response_time_for_episode)
 
         else:
             costs_per_episode.append(0)
@@ -585,7 +585,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     final_average_rmax_violations = sum(average_rmax_violations_per_episode) / len(average_rmax_violations_per_episode)
     final_average_cpu_utilization = sum(average_cpu_utilization_per_episode) / len(average_cpu_utilization_per_episode)
     final_avarage_containers = sum(avarage_containers_per_episode) / len(avarage_containers_per_episode)
-    final_avarage_response_time = sum(avarage_response_time_for_episode) / len(avarage_response_time_for_episode)
+    final_avarage_response_time = sum(avarage_response_time_per_episode) / len(avarage_response_time_per_episode)
     avarage_response_time = (total_response_time / total_actions)
     average_cpu_shares_new = (total_cpu_shares / total_actions)
     average_horizontal_scaling_final = sum(avarage_horizontal_scale_per_episode) / len(avarage_horizontal_scale_per_episode)
