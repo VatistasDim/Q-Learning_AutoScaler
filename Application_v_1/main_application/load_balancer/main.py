@@ -364,6 +364,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     avarage_horizontal_scale_per_episode = []
     avarage_no_action_per_episode = []
     avarage_failed_actions_per_episode = []
+    avarage_response_time_per_episode = []
     avarage_containers_per_episode = []
     average_rmax_violations_per_episode = []
     average_cpu_utilization_per_episode = []
@@ -557,7 +558,9 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             # Calculate the avarage contaners
             avarage_containers_for_episode = (total_containers / steps)
+            avarage_response_time_for_episode = (total_response_time / steps)
             avarage_containers_per_episode.append(avarage_containers_for_episode)
+            avarage_response_time_for_episode.append(avarage_response_time_for_episode)
 
         else:
             costs_per_episode.append(0)
@@ -582,6 +585,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     final_average_rmax_violations = sum(average_rmax_violations_per_episode) / len(average_rmax_violations_per_episode)
     final_average_cpu_utilization = sum(average_cpu_utilization_per_episode) / len(average_cpu_utilization_per_episode)
     final_avarage_containers = sum(avarage_containers_per_episode) / len(avarage_containers_per_episode)
+    final_avarage_response_time = sum(avarage_response_time_for_episode) / len(avarage_response_time_for_episode)
     avarage_response_time = (total_response_time / total_actions)
     average_cpu_shares_new = (total_cpu_shares / total_actions)
     average_horizontal_scaling_final = sum(avarage_horizontal_scale_per_episode) / len(avarage_horizontal_scale_per_episode)
@@ -590,7 +594,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     avarage_failed_action_final = sum(avarage_failed_actions_per_episode) / len(avarage_failed_actions_per_episode)
 
     return (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
-            average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time,
+            average_cpu_utilization, average_cpu_shares, average_num_containers, final_avarage_response_time,
             w_adp, w_perf, w_res, final_average_rmax_violations, final_average_cpu_utilization, final_avarage_containers, avarage_response_time, average_cpu_shares_new,
             average_horizontal_scaling_final, avarage_vertical_scale_final, avarage_horizontal_scale, avarage_vertical_scale, Q, avarage_no_action_final, avarage_failed_action_final)
     
