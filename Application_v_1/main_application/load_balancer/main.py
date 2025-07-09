@@ -65,6 +65,8 @@ cpu_shares_values = [1024, 512, 256, 128]  # CPU shares (1024, 512, 256, 128)
 state_space = list(itertools.product(cpu_shares_values, cpu_utilization_values, k_range))
 action_space = [-1, 0, 1, -512, 512]  # Actions: -1 (scale in), 0 (do nothing), 1 (scale out), -512 (decrease CPU shares), 512 (increase CPU shares)
 
+cu_estimate = {state: 0.0 for state in state_space}
+
 # Initialize Q-table
 # Q = np.zeros((len(state_space), len(action_space)))
 
@@ -442,14 +444,26 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             a2 = 1 if action in [-512, 512] else 0
             
             cost = Costs.overall_cost_function(w_adp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)
-
+            
+            ci = Costs.overall_cost_function(w_adp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)   # total cost = ck + cu
+            
+            ck = Costs.known_cost_function(w_adp, w_res, next_state[2], next_state[0], a1, a2, action, max_replicas) # known cost = ck
+            
+            cu_i = ci - ck # unknown cost sample
+            
+            cu_estimate[next_state] = (1 - alpha) * cu_estimate.get(next_state, 0.0) + alpha * cu_i
+            
+            print(f"Log: [cu_estimate] Updated for state {next_state}: "
+                f"sample cu_i = {cu_i:.4f}, "
+                f"new cu_estimate = {cu_estimate[next_state]:.4f}")
+            
             if action not in valid_actions:
                 print(f"[WARNING] Unknown action detected: {action}")
 
             total_cost += cost
-            print(f'Log: Cost: {cost}, action: {action}')
             
             total_reward += cost
+            cu_estimate[next_state] = (1 - alpha) * cu_estimate[next_state] + alpha * cu_i
             total_cpu_utilization += current_state[1]
             total_cpu_shares += current_state[0]
             total_containers += current_state[2]
@@ -489,8 +503,13 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             Q[current_state_idx, action_space.index(action)] = (
                 (1 - alpha) * Q[current_state_idx, action_space.index(action)] +
-                alpha * (cost + gamma * min(Q[next_state_idx, :]))
+                alpha * (ck + cu_estimate[next_state] + gamma * min(Q[next_state_idx, :]))
             )
+
+            # Q[current_state_idx, action_space.index(action)] = (
+            #     (1 - alpha) * Q[current_state_idx, action_space.index(action)] +
+            #     alpha * (cost + gamma * min(Q[next_state_idx, :]))
+            # )
             
             # Calculate ETA for the episode
             elapsed_time_episode = (datetime.now() - episode_start_time).total_seconds()
@@ -594,7 +613,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     avarage_failed_action_final = sum(avarage_failed_actions_per_episode) / len(avarage_failed_actions_per_episode)
 
     return (costs_per_episode, total_time_per_episode, average_cost_per_episode, Rmax_violations,
-            average_cpu_utilization, average_cpu_shares, average_num_containers, final_avarage_response_time,
+            average_cpu_utilization, average_cpu_shares, average_num_containers, average_response_time,
             w_adp, w_perf, w_res, final_average_rmax_violations, final_average_cpu_utilization, final_avarage_containers, avarage_response_time, average_cpu_shares_new,
             average_horizontal_scaling_final, avarage_vertical_scale_final, avarage_horizontal_scale, avarage_vertical_scale, Q, avarage_no_action_final, avarage_failed_action_final)
     

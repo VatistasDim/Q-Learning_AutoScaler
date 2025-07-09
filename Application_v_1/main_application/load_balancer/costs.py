@@ -20,3 +20,13 @@ class Costs:
         
         # Overall cost
         return term1 + term2 + term3
+
+    @staticmethod
+    def known_cost_function(wadp, wres, k_next_state, c_next_state, a1, a2, action, Kmax):
+        # Term 1: Adaptation cost (only vertical scaling is considered here)
+        term1 = wadp * int(is_vertical_scaling(action))
+        
+        # Term 2: Resource cost
+        term3 = wres * (k_next_state + a1) * (c_next_state + a2) / Kmax
+
+        return term1 + term3
