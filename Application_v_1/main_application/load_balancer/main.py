@@ -445,13 +445,13 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             cost = Costs.overall_cost_function(w_adp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)
             
-            ci = Costs.overall_cost_function(w_adp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)   # total cost = ck + cu
+            # ci = Costs.overall_cost_function(w_adp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)   # total cost = ck + cu
             
-            ck = Costs.known_cost_function(w_adp, w_res, next_state[2], next_state[0], a1, a2, action, max_replicas) # known cost = ck
+            # ck = Costs.known_cost_function(w_adp, w_res, next_state[2], next_state[0], a1, a2, action, max_replicas) # known cost = ck
             
-            cu_i = ci - ck # unknown cost sample
+            # cu_i = ci - ck # unknown cost sample
             
-            cu_estimate[next_state] = (1 - alpha) * cu_estimate.get(next_state, 0.0) + alpha * cu_i
+            # cu_estimate[next_state] = (1 - alpha) * cu_estimate.get(next_state, 0.0) + alpha * cu_i
             
             print(f"Log: [cu_estimate] Updated for state {next_state}: "
                 f"sample cu_i = {cu_i:.4f}, "
@@ -503,7 +503,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             Q[current_state_idx, action_space.index(action)] = (
                 (1 - alpha) * Q[current_state_idx, action_space.index(action)] +
-                alpha * (ck + cu_estimate[next_state] + gamma * min(Q[next_state_idx, :]))
+                alpha * (cost + gamma * min(Q[next_state_idx, :]))
             )
 
             # Q[current_state_idx, action_space.index(action)] = (
