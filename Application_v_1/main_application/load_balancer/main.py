@@ -453,9 +453,9 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             # cu_estimate[next_state] = (1 - alpha) * cu_estimate.get(next_state, 0.0) + alpha * cu_i
             
-            print(f"Log: [cu_estimate] Updated for state {next_state}: "
-                f"sample cu_i = {cu_i:.4f}, "
-                f"new cu_estimate = {cu_estimate[next_state]:.4f}")
+            # print(f"Log: [cu_estimate] Updated for state {next_state}: "
+            #     f"sample cu_i = {cu_i:.4f}, "
+            #     f"new cu_estimate = {cu_estimate[next_state]:.4f}")
             
             if action not in valid_actions:
                 print(f"[WARNING] Unknown action detected: {action}")
