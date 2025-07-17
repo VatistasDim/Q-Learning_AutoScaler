@@ -418,12 +418,16 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         total_horizontal_scaling_events = 0
         total_vertical_scaling_events = 0
 
+        # investigate how to collect all actions and the min costs.
+        # Dictionary [cost,action]. Select the minimum action based on cost in Q learning.
+
         while True:
             # TODO: Change the epsilon greedy policy here. We need to do it in e/i where i is the time of simulation.
             print("\n")
             current_state = next_state
             nearest_state = find_nearest_state(current_state, state_space)
-            action = select_action(Q, nearest_state, epsilon)
+            # current_action = 0
+            action_next =  select_action(Q, nearest_state, epsilon)
             next_state = transition(action)
             
             if not was_transition_succefull:
@@ -445,25 +449,12 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             cost = Costs.overall_cost_function(w_adp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)
             
-            # ci = Costs.overall_cost_function(w_adp, w_perf, w_res, next_state[2], next_state[1], next_state[0], action, a1, a2, Rmax, max_replicas, performance_penalty)   # total cost = ck + cu
-            
-            # ck = Costs.known_cost_function(w_adp, w_res, next_state[2], next_state[0], a1, a2, action, max_replicas) # known cost = ck
-            
-            # cu_i = ci - ck # unknown cost sample
-            
-            # cu_estimate[next_state] = (1 - alpha) * cu_estimate.get(next_state, 0.0) + alpha * cu_i
-            
-            # print(f"Log: [cu_estimate] Updated for state {next_state}: "
-            #     f"sample cu_i = {cu_i:.4f}, "
-            #     f"new cu_estimate = {cu_estimate[next_state]:.4f}")
-            
             if action not in valid_actions:
                 print(f"[WARNING] Unknown action detected: {action}")
 
             total_cost += cost
             
             total_reward += cost
-            cu_estimate[next_state] = (1 - alpha) * cu_estimate[next_state] + alpha * cu_i
             total_cpu_utilization += current_state[1]
             total_cpu_shares += current_state[0]
             total_containers += current_state[2]
@@ -503,13 +494,8 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             
             Q[current_state_idx, action_space.index(action)] = (
                 (1 - alpha) * Q[current_state_idx, action_space.index(action)] +
-                alpha * (cost + gamma * min(Q[next_state_idx, :]))
+                alpha * (cost + gamma * np.min(Q[next_state_idx]))
             )
-
-            # Q[current_state_idx, action_space.index(action)] = (
-            #     (1 - alpha) * Q[current_state_idx, action_space.index(action)] +
-            #     alpha * (cost + gamma * min(Q[next_state_idx, :]))
-            # )
             
             # Calculate ETA for the episode
             elapsed_time_episode = (datetime.now() - episode_start_time).total_seconds()
