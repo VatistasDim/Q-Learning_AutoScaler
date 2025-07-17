@@ -426,8 +426,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             print("\n")
             current_state = next_state
             nearest_state = find_nearest_state(current_state, state_space)
-            # current_action = 0
-            action_next =  select_action(Q, nearest_state, epsilon)
+            action = select_action(Q, nearest_state, epsilon)
             next_state = transition(action)
             
             if not was_transition_succefull:
