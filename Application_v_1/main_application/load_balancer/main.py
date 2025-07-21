@@ -33,6 +33,7 @@ wait_time = settings.get('wait_time', 10)
 baseline = settings.get('baseline', True)
 run_with_q = settings.get('run_with_q', True);
 num_of_rows = settings.get('number_of_rows', 1);
+run_with_predefined = settings.get('run_with_predefined', True);
 url = settings.get('url', 'http://prometheus:9090/api/v1/query')
 service_name = settings.get('service_name', 'mystack_application')
 max_replicas = settings.get('max_replicas', 10)
@@ -767,7 +768,7 @@ if __name__ == '__main__':
         
         check_and_delete_file(file_path)
         
-        w_perf_list, w_adp_list, w_res_list = create_file_with_random_weights(file_path, num_rows=num_of_rows)    
+        w_perf_list, w_adp_list, w_res_list = create_file_with_random_weights(file_path, num_rows=num_of_rows, run_with_predefined=run_with_predefined)    
         
         length = len(w_perf_list)
         

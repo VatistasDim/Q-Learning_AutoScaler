@@ -15,7 +15,7 @@ def check_and_delete_file(file_path):
     else:
         print(f"File '{file_path}' does not exist.")
 
-def create_file_with_random_weights(file_path, num_rows):
+def create_file_with_random_weights(file_path, num_rows, run_with_predefined = False):
     """
     Create a .txt file at the specified path and generate random weights.
     Each weight is a float value between 0 and 1, and three weights are 
@@ -40,6 +40,25 @@ def create_file_with_random_weights(file_path, num_rows):
     w_perf = []
     w_adp = []
     w_res = []
+
+    if(run_with_predefined):
+        
+        # Predefined configuration: prioritize Rmax violation
+        w_perf.append(0.90)
+        w_adp.append(0.01)
+        w_res.append(0.09)
+
+        # Prioritize saving resources
+        w_perf.append(0.09)
+        w_adp.append(0.01)
+        w_res.append(0.90)
+
+        # Balanced importance
+        w_perf.append(0.33)
+        w_adp.append(0.33)
+        w_res.append(0.33)
+
+        return w_perf, w_adp, w_res
 
     with open(file_path, "w") as file:
         for _ in range(num_rows):
