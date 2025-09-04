@@ -363,9 +363,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     - alpha, gamma, epsilon_start, epsilon_min, epsilon_decay are defined globals (or set below)
     - Rmax, max_replicas defined globally
     """
-    # Hyperparams (adjust if you set these globally)
-
-
+    
     # Epsilon schedule
     try:
         eps0 = epsilon_start
@@ -395,7 +393,7 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
     average_rmax_violations_per_episode = []
 
     valid_actions = [-1, 0, 1, -512, 512]
-
+    max_cost = 0
     total_actions = 0
     total_cpu_shares_global = 0.0
     total_response_time_global = 0.0
