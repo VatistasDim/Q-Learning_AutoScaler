@@ -411,10 +411,12 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         return int(np.argmin(diffs))
 
     def cost_to_reward(cost, performance_penalty, max_cost):
-        # normalize reward to [0, 1]
-        r = (max_cost - cost) / max_cost
+    # normalize reward: smaller cost → closer to 1, larger cost → closer to 0
+        r = (max_cost - cost) / max_cost if max_cost > 0 else 1.0
+    # add penalty if Rmax violated
         if performance_penalty > Rmax:
-            r -= (performance_penalty - Rmax) * 0.1  # scale penalty smaller
+            r -= (performance_penalty - Rmax) * 0.1  # adjust scaling factor
+            r = max(r, -1.0)  # clip so it doesn’t explode negative
         return r
 
     for episode in range(1, num_episodes + 1):
@@ -499,7 +501,8 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
 
             # aggregate episode-level stats
             total_cost += cost
-            reward = cost_to_reward(cost, performance_penalty)
+            max_cost = max(max_cost, cost)
+            reward = cost_to_reward(cost, performance_penalty, max_cost)
             total_reward += reward
             total_cpu_utilization += current_state[1]
             total_cpu_shares_global += current_state[0]
