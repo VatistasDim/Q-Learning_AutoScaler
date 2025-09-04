@@ -410,13 +410,11 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         diffs = [np.linalg.norm(np.array(state) - np.array(s)) for s in state_space]
         return int(np.argmin(diffs))
 
-    # Reward function helper: convert cost => reward (we maximize reward)
-    def cost_to_reward(cost, performance_penalty):
-        # simple inversion: reward = -cost
-        # add extra penalty for Rmax violation so agent learns to avoid it
-        r = -cost
+    def cost_to_reward(cost, performance_penalty, max_cost):
+        # normalize reward to [0, 1]
+        r = (max_cost - cost) / max_cost
         if performance_penalty > Rmax:
-            r -= (performance_penalty - Rmax) * 10.0  # scale penalty; tune as needed
+            r -= (performance_penalty - Rmax) * 0.1  # scale penalty smaller
         return r
 
     for episode in range(1, num_episodes + 1):
@@ -534,8 +532,9 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
             # Q(s,a) <- (1-alpha)*Q + alpha*(reward + gamma * max_a' Q(s',a'))
             Q[current_idx, action_idx] = (
                 (1 - alpha) * Q[current_idx, action_idx]
-                + alpha * (reward + gamma * np.min(Q[next_idx, :]))
+                + alpha * (reward + gamma * np.max(Q[next_idx, :]))
             )
+
 
             # Logging (minimal)
             if steps % 50 == 0:
