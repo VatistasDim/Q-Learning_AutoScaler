@@ -41,26 +41,6 @@ w_res = 0.3
 PROM_URL = "http://your-prometheus-server:9090/api/v1/query"
 
 # ----------------------------
-# State space
-# ----------------------------
-def get_state_space():
-    states = []
-    for k in range(1, Kmax + 1):
-        for u in range(0, u_max + 1, u_quantum):
-            for c in range(c_quantum, c_max + 1, c_quantum):
-                states.append((k, u, c))
-    return states
-
-states = get_state_space()
-state_to_idx = {s: i for i, s in enumerate(states)}
-
-# ----------------------------
-# Actions
-# ----------------------------
-actions = [("vscale", -10), ("hscale", -1), ("noop", 0), ("hscale", +1), ("vscale", +10)]
-n_actions = len(actions)
-
-# ----------------------------
 # Helper functions
 # ----------------------------
 def discretize(value, quantum, v_min, v_max):
@@ -105,19 +85,41 @@ def apply_action(service_name, state, action, prometheus_url=None):
         if cpu_shares is not None:
             c = cpu_shares
     else:
-        u = random.randint(20, 80)
         response_time = 100 + (u * 2) - (k * 5) - (c * 0.2)
 
+    # Get current replica count
     k = get_current_replica_count(service_name)
+
+    # Discretize all state variables
     k = min(max(1, k), Kmax)
-    u = min(max(0, u), u_max)
-    c = min(max(c_quantum, c), c_max)
-    time.sleep(2)
+    u = discretize(u, u_quantum, 0, u_max)
+    c = discretize(c, c_quantum, c_quantum, c_max)
+
     # Estimate response time if Prometheus not available
     if prometheus_url is None or response_time is None:
         response_time = 100 + (u * 2) - (k * 5) - (c * 0.2)
 
     return (k, u, c), response_time
+
+# ----------------------------
+# State space
+# ----------------------------
+def get_state_space():
+    states = []
+    for k in range(1, Kmax + 1):
+        for u in range(0, u_max + 1, u_quantum):
+            for c in range(c_quantum, c_max + 1, c_quantum):
+                states.append((k, u, c))
+    return states
+
+states = get_state_space()
+state_to_idx = {s: i for i, s in enumerate(states)}
+
+# ----------------------------
+# Actions
+# ----------------------------
+actions = [("vscale", -10), ("hscale", -1), ("noop", 0), ("hscale", +1), ("vscale", +10)]
+n_actions = len(actions)
 
 # ----------------------------
 # Q-learning loop
@@ -128,13 +130,16 @@ for ep in range(episodes):
     # Initial state
     state = (
         min(max(1, get_current_replica_count("mystack_application")), Kmax),
-        random.randint(20, 80),
-        min(max(c_quantum, get_current_cpu_shares("mystack_application")), c_max)
+        discretize(random.randint(20, 80), u_quantum, 0, u_max),
+        discretize(min(max(c_quantum, get_current_cpu_shares("mystack_application")), c_max), c_quantum, c_quantum, c_max)
     )
 
     total_cost = 0
 
     for _ in range(steps_per_episode):
+        # Ensure discretized state before Q-table lookup
+        k, u, c = state
+        state = (k, discretize(u, u_quantum, 0, u_max), discretize(c, c_quantum, c_quantum, c_max))
         s_idx = state_to_idx[state]
 
         # Epsilon-greedy
@@ -143,19 +148,22 @@ for ep in range(episodes):
 
         # Apply action with live metrics
         next_state, R_current = apply_action("mystack_application", state, action, prometheus_url=PROM_URL)
-        if R_current is None:
-            R_current = 100 + (state[1]*2) - (state[0]*5) - (state[2]*0.2)
+        # Ensure next_state discretization
+        k_next, u_next, c_next = next_state
+        next_state = (k_next, discretize(u_next, u_quantum, 0, u_max), discretize(c_next, c_quantum, c_quantum, c_max))
+        s_next_idx = state_to_idx[next_state]
 
         # Extract action effect for cost function
         a1 = action[1] if action[0] == "hscale" else 0
         a2 = action[1] if action[0] == "vscale" else 0
 
+        # Compute cost
         cost = Costs.overall_cost_function(
             wadp=w_adp, wperf=w_perf, wres=w_res,
             k_next_state=next_state[0],
             u_next_state=next_state[1],
             c_next_state=next_state[2],
-            action=action,  # pass the tuple directly
+            action=action,
             a1=a1, a2=a2,
             Rmax=Rmax,
             Kmax=Kmax,
@@ -166,7 +174,6 @@ for ep in range(episodes):
         total_cost += cost
 
         # Q-update
-        s_next_idx = state_to_idx[next_state]
         Q[s_idx, a_idx] = (1 - alpha) * Q[s_idx, a_idx] + alpha * (reward + gamma * np.min(Q[s_next_idx, :]))
 
         state = next_state
