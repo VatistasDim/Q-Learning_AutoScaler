@@ -138,14 +138,21 @@ for ep in range(episodes):
 
     total_cost = 0
 
-    for _ in range(steps_per_episode):
+    for step in range(steps_per_episode):
+        remaining_steps = steps_per_episode - step
         # Ensure discretized state before Q-table lookup
         k, u, c = state
         state = (k, discretize(u, u_quantum, 0, u_max), discretize(c, c_quantum, c_quantum, c_max))
         s_idx = state_to_idx[state]
 
         # Epsilon-greedy
-        a_idx = np.random.randint(n_actions) if random.random() < epsilon else np.argmin(Q[s_idx, :])
+        if random.random() < epsilon:
+            a_idx = np.random.randint(n_actions)
+            action_type = "Random (exploration)"
+        else:
+            a_idx = np.argmin(Q[s_idx, :])
+            action_type = "Greedy (exploitation)"
+
         action = actions[a_idx]
 
         # Apply action with live metrics
@@ -178,9 +185,16 @@ for ep in range(episodes):
         # Q-update
         Q[s_idx, a_idx] = (1 - alpha) * Q[s_idx, a_idx] + alpha * (reward + gamma * np.min(Q[s_next_idx, :]))
 
+        # Monitor progress
+        print(f"Episode {ep+1}/{episodes}, Step {step+1}/{steps_per_episode} (Remaining: {remaining_steps})")
+        print(f"    Current state: {state}")
+        print(f"    Action selected: {action} [{action_type}]")
+        print(f"    Next state: {next_state}")
+        print(f"    Response time: {R_current:.2f}, Cost: {cost:.3f}\n")
+
         state = next_state
 
-    print(f"Episode {ep+1}/{episodes} - Total cost: {total_cost:.3f}")
+    print(f"Episode {ep+1}/{episodes} finished - Total cost: {total_cost:.3f}\n{'-'*50}")
 
 print("Training finished ✅")
 
