@@ -126,6 +126,8 @@ n_actions = len(actions)
 # ----------------------------
 Q = np.zeros((len(states), n_actions))
 
+time.sleep(30)
+
 for ep in range(episodes):
     # Initial state
     state = (
