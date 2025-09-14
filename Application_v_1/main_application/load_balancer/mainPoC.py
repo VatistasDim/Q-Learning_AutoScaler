@@ -38,7 +38,7 @@ w_perf = 0.5
 w_res = 0.3
 
 # Prometheus URL
-PROM_URL = "http://your-prometheus-server:9090/api/v1/query"
+PROM_URL = "http://prometheus:9090/api/v1/query"
 
 # ----------------------------
 # Helper functions
