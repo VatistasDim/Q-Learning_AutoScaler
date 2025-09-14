@@ -413,8 +413,8 @@ def run_q_learning(num_episodes, w_perf, w_adp, w_res):
         r = (max_cost - cost) / max_cost if max_cost > 0 else 1.0
     # add penalty if Rmax violated
         if performance_penalty > Rmax:
-            r -= (performance_penalty - Rmax) * 0.1  # adjust scaling factor
-            r = max(r, -1.0)  # clip so it doesn’t explode negative
+            r -= (performance_penalty - Rmax) * 0.1 
+            r = max(r, -1.0)
         return r
 
     for episode in range(1, num_episodes + 1):
