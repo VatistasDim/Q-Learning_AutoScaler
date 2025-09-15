@@ -58,11 +58,18 @@ def fetch_metrics_periodically(url):
     cpu_percent = get_cpu_metrics(url)
     response_time = get_response_time(url)
     cpu_shares = get_cpu_shares(url)
-    if cpu_percent is not None and response_time is not None and cpu_shares is not None:
-        return cpu_percent, response_time, cpu_shares
-    else:
-        return None
+    return cpu_percent, response_time, cpu_shares
 
 def start_metrics_service(url):
-    metrics = fetch_metrics_periodically(url)
-    return metrics
+    cpu_percent, response_time, cpu_shares = fetch_metrics_periodically(url)
+
+    # Debugging: log which metrics are missing
+    if cpu_percent is None:
+        print("⚠️ Missing metric: CPU usage")
+    if response_time is None:
+        print("⚠️ Missing metric: Response time")
+    if cpu_shares is None:
+        print("⚠️ Missing metric: CPU shares")
+
+    return cpu_percent, response_time, cpu_shares
+
