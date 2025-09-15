@@ -56,14 +56,15 @@ def discretize(value, quantum, v_min, v_max):
     value = max(v_min, min(value, v_max))
     return int(round(value / quantum) * quantum)
 
-def fetch_data(service_name="mystack_application", max_attempts=10, retry_delay=5):
+def fetch_data(service_name="mystack_application", max_attempts=30, retry_delay=5):
     for attempt in range(max_attempts):
         try:
             cpu_percent, response_time, cpu_shares = prometheus_metrics.start_metrics_service(PROM_URL)
 
             # Check None before conversion
             if None in (cpu_percent, response_time, cpu_shares):
-                continue
+                if attempt < max_attempts - 1:
+                    time.sleep(retry_delay)
 
             cpu_percent = int(float(cpu_percent))
             response_time = float(response_time)
