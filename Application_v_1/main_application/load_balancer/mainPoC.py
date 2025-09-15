@@ -34,8 +34,8 @@ STEP_DURATION = 10  # seconds
 docker_api = DockerAPI(stack_name="mystack_application")
 
 # Q-learning parameters
-episodes = 2
-steps_per_episode = 2
+episodes = 100
+steps_per_episode = 10
 alpha = 0.1
 gamma = 0.95
 epsilon = 0.1
