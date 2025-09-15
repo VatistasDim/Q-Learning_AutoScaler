@@ -74,7 +74,7 @@ def fetch_data(service_name, url, max_attempts=10):
 def apply_action(service_name, state, action, prometheus_url=None):
     k, u, c = state
 
-    # Execute scaling
+    # --- Execute scaling ---
     if action[0] == "hscale":
         if action[1] > 0:
             scale_out(service_name, action[1])
@@ -86,29 +86,27 @@ def apply_action(service_name, state, action, prometheus_url=None):
         set_cpu_shares(service_name, calculate_cpu_shares(new_cpu / 10))
     # noop does nothing
 
-    # Update state with live metrics if available
-    if prometheus_url:
-        cpu_percent, _, _, response_time, cpu_shares = fetch_data(service_name, prometheus_url)
-        if cpu_percent is not None:
-            u = cpu_percent
-        if cpu_shares is not None:
-            c = cpu_shares
-    else:
-        response_time = 100 + (u * 2) - (k * 5) - (c * 0.2)
+    # --- Get metrics from Prometheus ---
+    cpu_percent, ram_percent, time_up, response_time, cpu_shares = fetch_data(service_name, prometheus_url)
 
-    # Get current replica count
-    k = get_current_replica_count(service_name)
+    # Fallback if Prometheus is missing something
+    if response_time is None:
+        response_time = u  # just keep previous response time if metric missing
+    if cpu_shares is None:
+        cpu_shares = c     # keep previous cpu_shares
 
-    # Discretize all state variables
-    k = min(max(1, k), Kmax)
-    u = discretize(u, u_quantum, 0, u_max)
-    c = discretize(c, c_quantum, c_quantum, c_max)
+    # Update state (replicas and cpu_shares from Docker)
+    k_actual = get_current_replica_count(service_name) or 1
+    c_actual = cpu_shares or get_current_cpu_shares(service_name) or c
 
-    # Estimate response time if Prometheus not available
-    if prometheus_url is None or response_time is None:
-        response_time = 100 + (u * 2) - (k * 5) - (c * 0.2)
+    # New discrete state
+    next_state = (
+        min(max(1, k_actual), Kmax),
+        discretize(response_time, u_quantum, 0, u_max),
+        discretize(c_actual, c_quantum, c_quantum, c_max)
+    )
 
-    return (k, u, c), response_time
+    return next_state, response_time
 
 # ----------------------------
 # State space
@@ -171,9 +169,6 @@ for ep in range(episodes):
             scaling_steps += 1
 
         next_state, R_current = apply_action("mystack_application", state, action, prometheus_url=PROM_URL)
-        if R_current is None:
-            R_current = 100 + (state[1]*2) - (state[0]*5) - (state[2]*0.2)
-
         if R_current <= Rmax:
             performance_met += 1
 
