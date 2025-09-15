@@ -60,22 +60,20 @@ def fetch_data():
     max_attempts = 100
     for attempt in range(max_attempts):
         try:
-            cpu_percent, ram_percent, time_up, response_time, cpu_shares = prometheus_metrics.start_metrics_service(url=PROM_URL)
-            if time_up != '0':
-                cpu_percent = int(float(cpu_percent))
-                ram_percent = int(float(ram_percent))
-                time_up = int(float(time_up))
-                response_time = float(response_time)
-                cpu_shares = calculate_cpu_shares(get_current_cpu_shares("mystack_application"))
-                if None in (cpu_percent, ram_percent, time_up, response_time, cpu_shares):
-                    continue
-                return cpu_percent, ram_percent, time_up, response_time, cpu_shares
+            cpu_percent, ram_percent, response_time, cpu_shares = prometheus_metrics.start_metrics_service(PROM_URL)
+            cpu_percent = int(float(cpu_percent))
+            ram_percent = int(float(ram_percent))
+            response_time = float(response_time)
+            cpu_shares = calculate_cpu_shares(get_current_cpu_shares("mystack_application"))
+            if None in (cpu_percent, ram_percent, response_time, cpu_shares):
+                continue
+            return cpu_percent, ram_percent, response_time, cpu_shares
         except Exception as e:
             print(f"Error: An error occurred during service metrics retrieval (Attempt {attempt + 1}/{max_attempts}):", e)
             if attempt < max_attempts - 1:
                 time.sleep(5)
     print("Failed to retrieve metrics after multiple attempts.")
-    return None, None, None, None, None
+    return None, None, None, None
 
 def apply_action(service_name, state, action, prometheus_url=None):
     k, u, c = state
