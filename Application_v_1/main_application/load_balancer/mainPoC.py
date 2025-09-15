@@ -128,45 +128,59 @@ Q = np.zeros((len(states), n_actions))
 
 time.sleep(30)
 
+# ----------------------------
+# Q-learning loop with goal monitoring
+# ----------------------------
+Q = np.zeros((len(states), n_actions))
+
 for ep in range(episodes):
     # Initial state
     state = (
         min(max(1, get_current_replica_count("mystack_application")), Kmax),
-        discretize(random.randint(20, 80), u_quantum, 0, u_max),
-        discretize(min(max(c_quantum, get_current_cpu_shares("mystack_application")), c_max), c_quantum, c_quantum, c_max)
+        random.randint(20, 80),
+        min(max(c_quantum, get_current_cpu_shares("mystack_application")), c_max)
     )
 
     total_cost = 0
+    total_k = 0
+    total_c = 0
+    performance_met = 0
+    scaling_steps = 0
 
     for step in range(steps_per_episode):
-        remaining_steps = steps_per_episode - step
-        # Ensure discretized state before Q-table lookup
-        k, u, c = state
-        state = (k, discretize(u, u_quantum, 0, u_max), discretize(c, c_quantum, c_quantum, c_max))
-        s_idx = state_to_idx[state]
+        s_idx = state_to_idx.get(state)
+        if s_idx is None:
+            # safety check
+            state = (min(max(1, state[0]), Kmax),
+                     discretize(state[1], u_quantum, 0, u_max),
+                     discretize(state[2], c_quantum, c_quantum, c_max))
+            s_idx = state_to_idx[state]
 
         # Epsilon-greedy
-        if random.random() < epsilon:
-            a_idx = np.random.randint(n_actions)
-            action_type = "Random (exploration)"
-        else:
-            a_idx = np.argmin(Q[s_idx, :])
-            action_type = "Greedy (exploitation)"
-
+        a_idx = np.random.randint(n_actions) if random.random() < epsilon else np.argmin(Q[s_idx, :])
         action = actions[a_idx]
+
+        # Count scaling actions
+        if action[0] in ["hscale", "vscale"] and action[1] != 0:
+            scaling_steps += 1
 
         # Apply action with live metrics
         next_state, R_current = apply_action("mystack_application", state, action, prometheus_url=PROM_URL)
-        # Ensure next_state discretization
-        k_next, u_next, c_next = next_state
-        next_state = (k_next, discretize(u_next, u_quantum, 0, u_max), discretize(c_next, c_quantum, c_quantum, c_max))
-        s_next_idx = state_to_idx[next_state]
+        if R_current is None:
+            R_current = 100 + (state[1]*2) - (state[0]*5) - (state[2]*0.2)
+
+        # Performance goal
+        if R_current <= Rmax:
+            performance_met += 1
+
+        # Accumulate resource usage
+        total_k += next_state[0]
+        total_c += next_state[2]
 
         # Extract action effect for cost function
         a1 = action[1] if action[0] == "hscale" else 0
         a2 = action[1] if action[0] == "vscale" else 0
 
-        # Compute cost
         cost = Costs.overall_cost_function(
             wadp=w_adp, wperf=w_perf, wres=w_res,
             k_next_state=next_state[0],
@@ -183,20 +197,25 @@ for ep in range(episodes):
         total_cost += cost
 
         # Q-update
+        s_next_idx = state_to_idx[next_state]
         Q[s_idx, a_idx] = (1 - alpha) * Q[s_idx, a_idx] + alpha * (reward + gamma * np.min(Q[s_next_idx, :]))
-
-        # Monitor progress
-        print(f"Episode {ep+1}/{episodes}, Step {step+1}/{steps_per_episode} (Remaining: {remaining_steps})")
-        print(f"    Current state: {state}")
-        print(f"    Action selected: {action} [{action_type}]")
-        print(f"    Next state: {next_state}")
-        print(f"    Response time: {R_current:.2f}, Cost: {cost:.3f}\n")
 
         state = next_state
 
-    print(f"Episode {ep+1}/{episodes} finished - Total cost: {total_cost:.3f}\n{'-'*50}")
+        # Print step info
+        print(f"Episode {ep+1}, Step {step+1}/{steps_per_episode}, Action: {action}, State: {state}, R_current: {R_current:.2f}")
 
-print("Training finished ✅")
+    # Episode summary
+    avg_k = total_k / steps_per_episode
+    avg_c = total_c / steps_per_episode
+    print(f"\nEpisode {ep+1} Summary:")
+    print(f"  Total cost: {total_cost:.3f}")
+    print(f"  Performance goal met: {performance_met}/{steps_per_episode} steps ({performance_met/steps_per_episode*100:.1f}%)")
+    print(f"  Average replicas / CPU shares: {avg_k:.2f} / {avg_c:.2f}")
+    print(f"  Scaling frequency: {scaling_steps}/{steps_per_episode} steps ({scaling_steps/steps_per_episode*100:.1f}%)")
+    print("-"*50)
+
+print("Training finished..")
 
 # ----------------------------
 # Print top actions for states where k=Kmax
