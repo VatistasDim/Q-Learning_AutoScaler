@@ -68,13 +68,11 @@ def fetch_data(service_name="mystack_application", max_attempts=10, retry_delay=
             cpu_percent = int(float(cpu_percent))
             response_time = float(response_time)
 
-            # If you want Docker shares instead of Prometheus shares:
             cpu_shares = calculate_cpu_shares(get_current_cpu_shares(service_name))
 
             return cpu_percent, response_time, cpu_shares
 
         except Exception as e:
-            print(f"[fetch_data] Attempt {attempt+1}/{max_attempts} failed: {e}")
             if attempt < max_attempts - 1:
                 time.sleep(retry_delay)
 
@@ -111,12 +109,11 @@ def apply_action(service_name, state, action, prometheus_url=None):
 
     # New discrete state
     next_state = (
-        min(max(1, k_actual), Kmax),
-        discretize(response_time, u_quantum, 0, u_max),
-        discretize(c_actual, c_quantum, c_quantum, c_max)
+        min(max(1, k_actual), Kmax),                       # replicas
+        discretize(cpu_percent, u_quantum, 0, u_max),      # CPU utilization from Prometheus
+        discretize(c_actual, c_quantum, c_quantum, c_max)  # CPU shares
     )
-
-    return next_state, response_time
+    return next_state, cpu_percent, response_time
 
 # ----------------------------
 # State space
@@ -178,7 +175,7 @@ for ep in range(episodes):
         if action[0] in ["hscale", "vscale"] and action[1] != 0:
             scaling_steps += 1
 
-        next_state, R_current = apply_action("mystack_application", state, action, prometheus_url=PROM_URL)
+        next_state, cpu_percent, R_current = apply_action("mystack_application", state, action, prometheus_url=PROM_URL)
         if R_current <= Rmax:
             performance_met += 1
 
