@@ -93,7 +93,7 @@ def apply_action(service_name, state, action, prometheus_url=None):
     # noop does nothing
 
     # --- Get metrics from Prometheus ---
-    cpu_percent, ram_percent, time_up, response_time, cpu_shares = fetch_data(service_name, prometheus_url)
+    cpu_percent, ram_percent, time_up, response_time, cpu_shares = fetch_data()
 
     # Fallback if Prometheus is missing something
     if response_time is None:
