@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import os
 import time
 from scalingOperations import (
     scale_out,
@@ -13,6 +14,13 @@ from costs import Costs
 from docker_api import DockerAPI
 from prometheus_metrics import start_metrics_service
 
+learning_report = {
+    "episodes": [],
+    "best_actions_per_state": {},
+    "worst_actions_per_state": {},
+    "overall_statistics": {}
+}
+
 # ----------------------------
 # Parameters
 # ----------------------------
@@ -21,21 +29,22 @@ u_max = 100      # CPU utilization (%)
 c_max = 100      # CPU shares
 u_quantum = 10
 c_quantum = 10
+STEP_DURATION = 10  # seconds
 
 docker_api = DockerAPI(stack_name="mystack_application")
 
 # Q-learning parameters
-episodes = 10
-steps_per_episode = 30
+episodes = 2
+steps_per_episode = 2
 alpha = 0.1
 gamma = 0.95
 epsilon = 0.1
 
 # Scaling & cost parameters
-Rmax = 200  # max acceptable response time
-w_adp = 0.2
-w_perf = 0.5
-w_res = 0.3
+Rmax = 80  # max acceptable response time
+w_adp = 0.33
+w_perf = 0.33
+w_res = 0.33
 
 # Prometheus URL
 PROM_URL = "http://prometheus:9090/api/v1/query"
@@ -113,6 +122,7 @@ def get_state_space():
     return states
 
 states = get_state_space()
+# Create a mapping from each state tuple (k, u, c) to a unique index in the states list.
 state_to_idx = {s: i for i, s in enumerate(states)}
 
 # ----------------------------
@@ -127,11 +137,6 @@ n_actions = len(actions)
 Q = np.zeros((len(states), n_actions))
 
 time.sleep(30)
-
-# ----------------------------
-# Q-learning loop with goal monitoring
-# ----------------------------
-Q = np.zeros((len(states), n_actions))
 
 for ep in range(episodes):
     # Initial state
@@ -148,6 +153,7 @@ for ep in range(episodes):
     scaling_steps = 0
 
     for step in range(steps_per_episode):
+        step_start = time.time() # start timer
         s_idx = state_to_idx.get(state)
         if s_idx is None:
             # safety check
@@ -164,12 +170,10 @@ for ep in range(episodes):
         if action[0] in ["hscale", "vscale"] and action[1] != 0:
             scaling_steps += 1
 
-        # Apply action with live metrics
         next_state, R_current = apply_action("mystack_application", state, action, prometheus_url=PROM_URL)
         if R_current is None:
             R_current = 100 + (state[1]*2) - (state[0]*5) - (state[2]*0.2)
 
-        # Performance goal
         if R_current <= Rmax:
             performance_met += 1
 
@@ -201,9 +205,35 @@ for ep in range(episodes):
         Q[s_idx, a_idx] = (1 - alpha) * Q[s_idx, a_idx] + alpha * (reward + gamma * np.min(Q[s_next_idx, :]))
 
         state = next_state
-
+        
+        # --- Wait until STEP_DURATION min has passed ---
+        elapsed = time.time() - step_start
+        if elapsed < STEP_DURATION:
+            time.sleep(STEP_DURATION - elapsed)
+       
         # Print step info
         print(f"Episode {ep+1}, Step {step+1}/{steps_per_episode}, Action: {action}, State: {state}, R_current: {R_current:.2f}")
+    
+    best_actions = {}
+    worst_actions = {}
+    for s in states:
+        s_idx = state_to_idx[s]
+        best_idx = np.argmin(Q[s_idx, :])
+        worst_idx = np.argmax(Q[s_idx, :])
+        best_actions[s] = (actions[best_idx], -Q[s_idx, best_idx])
+        worst_actions[s] = (actions[worst_idx], -Q[s_idx, worst_idx])
+
+    episode_stats = {
+        "episode": ep + 1,
+        "total_cost": total_cost,
+        "performance_met_percentage": performance_met / steps_per_episode * 100,
+        "scaling_frequency_percentage": scaling_steps / steps_per_episode * 100,
+        "avg_replicas": total_k / steps_per_episode,
+        "avg_cpu_shares": total_c / steps_per_episode,
+        "best_actions": best_actions,
+        "worst_actions": worst_actions
+    }
+    learning_report["episodes"].append(episode_stats)
 
     # Episode summary
     avg_k = total_k / steps_per_episode
@@ -225,3 +255,43 @@ for s in states:
         best_action_idx = np.argmin(Q[state_to_idx[s], :])
         best_action = actions[best_action_idx]
         print(f"State {s}: Best action -> {best_action}, Expected cost -> {-Q[state_to_idx[s], best_action_idx]:.3f}")
+
+# Overall summary
+total_episodes = len(learning_report["episodes"])
+avg_cost = sum(ep["total_cost"] for ep in learning_report["episodes"]) / total_episodes
+avg_perf = sum(ep["performance_met_percentage"] for ep in learning_report["episodes"]) / total_episodes
+avg_scaling = sum(ep["scaling_frequency_percentage"] for ep in learning_report["episodes"]) / total_episodes
+
+learning_report["overall_statistics"] = {
+    "avg_total_cost": avg_cost,
+    "avg_performance_met_percentage": avg_perf,
+    "avg_scaling_frequency_percentage": avg_scaling
+}
+
+# Save to file
+report_file = "/logs/q-learning-final-log.txt"
+with open(report_file, "w") as f:
+    f.write("Q-Learning Final Report\n")
+    f.write("="*50 + "\n\n")
+    
+    for ep_stat in learning_report["episodes"]:
+        f.write(f"Episode {ep_stat['episode']}\n")
+        f.write(f"  Total cost: {ep_stat['total_cost']:.2f}\n")
+        f.write(f"  Performance goal met: {ep_stat['performance_met_percentage']:.1f}%\n")
+        f.write(f"  Scaling frequency: {ep_stat['scaling_frequency_percentage']:.1f}%\n")
+        f.write(f"  Average replicas: {ep_stat['avg_replicas']:.2f}\n")
+        f.write(f"  Average CPU shares: {ep_stat['avg_cpu_shares']:.2f}\n")
+        f.write("  Best actions per state:\n")
+        for state, (action, cost) in ep_stat['best_actions'].items():
+            f.write(f"    State {state}: Action {action}, Expected cost {cost:.2f}\n")
+        f.write("  Worst actions per state:\n")
+        for state, (action, cost) in ep_stat['worst_actions'].items():
+            f.write(f"    State {state}: Action {action}, Expected cost {cost:.2f}\n")
+        f.write("\n")
+    
+    f.write("="*50 + "\n")
+    f.write("Overall statistics:\n")
+    for key, val in learning_report["overall_statistics"].items():
+        f.write(f"  {key}: {val:.2f}\n")
+
+print(f"Final report saved to {report_file}")

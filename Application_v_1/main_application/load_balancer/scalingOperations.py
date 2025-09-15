@@ -63,11 +63,11 @@ def scale_in(service_name, scale_factor=1):
         desired_replicas = current_replicas - scale_factor
         service = client.services.get(service_name)
         service.scale(desired_replicas)
-        print(f"Log: Service '{service_name}' scaled in to {desired_replicas} replicas.")
+        print(f"Service '{service_name}' scaled in to {desired_replicas} replicas.")
         time.sleep(wait_time)
         return True
     else:
-        print("Log: Minimum replicas reached. Cannot scale in further.")
+        print("Minimum replicas reached. Cannot scale in further.")
         return False
 
 # ----------------------------
@@ -87,7 +87,7 @@ def set_cpu_shares(service_name, cpu_shares, retry_attempts=5):
 
             resources['Limits']['NanoCPUs'] = desired_shares_nano
             service.update(resources=resources)
-            print(f"Log: CPU shares set to {cpu_shares} ({desired_shares_nano} NanoCPUs) for service '{service_name}'")
+            print(f"CPU shares set to {cpu_shares} ({desired_shares_nano} NanoCPUs) for service '{service_name}'")
             time.sleep(wait_time)
             return True
         except docker.errors.NotFound:
