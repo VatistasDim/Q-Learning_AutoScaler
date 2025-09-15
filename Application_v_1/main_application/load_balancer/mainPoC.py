@@ -56,22 +56,29 @@ def discretize(value, quantum, v_min, v_max):
     value = max(v_min, min(value, v_max))
     return int(round(value / quantum) * quantum)
 
-def fetch_data():
-    max_attempts = 100
+def fetch_data(service_name="mystack_application", max_attempts=10, retry_delay=5):
     for attempt in range(max_attempts):
         try:
             cpu_percent, response_time, cpu_shares = prometheus_metrics.start_metrics_service(PROM_URL)
-            cpu_percent = int(float(cpu_percent))
-            response_time = float(response_time)
-            cpu_shares = calculate_cpu_shares(get_current_cpu_shares("mystack_application"))
+
+            # Check None before conversion
             if None in (cpu_percent, response_time, cpu_shares):
                 continue
+
+            cpu_percent = int(float(cpu_percent))
+            response_time = float(response_time)
+
+            # If you want Docker shares instead of Prometheus shares:
+            cpu_shares = calculate_cpu_shares(get_current_cpu_shares(service_name))
+
             return cpu_percent, response_time, cpu_shares
+
         except Exception as e:
-            print(f"Error: An error occurred during service metrics retrieval (Attempt {attempt + 1}/{max_attempts}):", e)
+            print(f"[fetch_data] Attempt {attempt+1}/{max_attempts} failed: {e}")
             if attempt < max_attempts - 1:
-                time.sleep(5)
-    print("Failed to retrieve metrics after multiple attempts.")
+                time.sleep(retry_delay)
+
+    print("[fetch_data] Failed to retrieve metrics after multiple attempts.")
     return None, None, None
 
 def apply_action(service_name, state, action, prometheus_url=None):
