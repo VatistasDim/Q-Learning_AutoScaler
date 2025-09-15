@@ -19,7 +19,7 @@ def get_cpu_metrics(url):
         return None
 
 def get_response_time(url):
-    params = {'query': 'json_endpoint_response_time_seconds_sum{job="swarm-service"} / #json_endpoint_response_time_seconds_count{job="swarm-service"} '}
+    params = {'query': 'json_endpoint_response_time_seconds_sum{job="swarm-service"} / json_endpoint_response_time_seconds_count{job="swarm-service"}'}
     try:
         response = requests.get(url, params=params)
         if response.status_code == 200:
