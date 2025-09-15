@@ -41,7 +41,7 @@ gamma = 0.95
 epsilon = 0.1
 
 # Scaling & cost parameters
-Rmax = 80  # max acceptable response time
+Rmax = 0.80  # max acceptable response time
 w_adp = 0.33
 w_perf = 0.33
 w_res = 0.33
