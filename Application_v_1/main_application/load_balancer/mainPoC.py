@@ -153,7 +153,14 @@ for ep in range(episodes):
     step_logs = []
 
     for step in range(steps_per_episode):
+        
         step_start = time.time()
+        k, u, c = state
+        state = (
+            min(max(1, k), Kmax),
+            discretize(u, u_quantum, 0, u_max),
+            discretize(c, c_quantum, c_quantum, c_max)
+        )
         s_idx = state_to_idx[state]
 
         a_idx = np.random.randint(n_actions) if random.random() < epsilon else np.argmin(Q[s_idx, :])
