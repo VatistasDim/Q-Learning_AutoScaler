@@ -171,7 +171,7 @@ for ep in range(episodes):
 
         next_state, R_next = apply_action("mystack_application", state, action, prometheus_url=PROM_URL)
 
-        cost, term1, term2, term3 = Costs.overall_cost_function(
+        costs = Costs.overall_cost_function(
             wadp=w_adp, wperf=w_perf, wres=w_res,
             k_next_state=next_state[0],
             u_next_state=next_state[1],
@@ -181,7 +181,7 @@ for ep in range(episodes):
             response_time=R_next
         )
 
-        total_cost += cost
+        total_cost = costs["total"]
         total_k += next_state[0]
         total_c += next_state[2]
         if R_next <= Rmax:
@@ -191,7 +191,7 @@ for ep in range(episodes):
 
         # Q-update
         s_next_idx = state_to_idx[next_state]
-        Q[s_idx, a_idx] = (1 - alpha) * Q[s_idx, a_idx] + alpha * (cost + gamma * np.min(Q[s_next_idx, :]))
+        Q[s_idx, a_idx] = (1 - alpha) * Q[s_idx, a_idx] + alpha * (costs["total"] + gamma * np.min(Q[s_next_idx, :]))
         state = next_state
 
         # Log step
@@ -200,10 +200,10 @@ for ep in range(episodes):
             "state": state,
             "action": action,
             "R_next": R_next,
-            "cost": cost,
-            "term1_adaptation": term1,
-            "term2_performance": term2,
-            "term3_resources": term3
+            "cost": costs["total"],
+            "term1_adaptation": costs["term1"],
+            "term2_performance": costs["term2"],
+            "term3_resources": costs["term3"]
         })
 
         elapsed = time.time() - step_start

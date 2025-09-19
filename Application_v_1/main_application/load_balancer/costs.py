@@ -9,6 +9,10 @@ class Costs:
         action, a1, a2,
         Rmax, Kmax, response_time
     ):
+        """
+        Compute the cost and its components.
+        Returns a dictionary with all terms.
+        """
         # --- Term 1: Adaptation cost (vertical scaling) ---
         vertical_scaling_indicator = int(is_vertical_scaling(action))
         term1 = wadp * vertical_scaling_indicator
@@ -21,8 +25,14 @@ class Costs:
 
         # --- Term 3: Resource usage cost ---
         resource_usage = k_effective * c_effective
-        term3 = wres * (resource_usage / max(1, Kmax * c_effective))  # normalize by max possible
+        term3 = wres * (resource_usage / max(1, Kmax * c_effective))  # avoid division by zero
 
         # --- Total cost ---
         total_cost = term1 + term2 + term3
-        return total_cost, term1, term2, term3
+
+        return {
+            "total": total_cost,
+            "term1": term1,
+            "term2": term2,
+            "term3": term3
+        }
