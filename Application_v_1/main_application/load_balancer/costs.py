@@ -21,7 +21,7 @@ class Costs:
 
         # --- Term 3: Resource usage cost ---
         resource_usage = k_effective * c_effective
-        term3 = wres * (resource_usage / (Kmax * c_effective))  # normalize by max possible
+        term3 = wres * (resource_usage / max(1, Kmax * c_effective))  # normalize by max possible
 
         # --- Total cost ---
         total_cost = term1 + term2 + term3
