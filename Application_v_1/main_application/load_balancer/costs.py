@@ -25,4 +25,4 @@ class Costs:
 
         # --- Total cost ---
         total_cost = term1 + term2 + term3
-        return total_cost
+        return total_cost, term1, term2, term3
