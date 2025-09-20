@@ -96,6 +96,8 @@ def apply_action(service_name, state, action, prometheus_url=None):
         new_cpu = max(c_quantum, min(new_cpu, c_max))
         set_cpu_shares(service_name, calculate_cpu_shares(new_cpu / 10))
     # noop does nothing
+    
+    time.sleep(30)
 
     # --- Get metrics ---
     cpu_percent, response_time, cpu_shares = fetch_data()

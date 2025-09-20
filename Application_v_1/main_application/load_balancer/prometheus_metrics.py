@@ -19,18 +19,23 @@ def get_cpu_metrics(url):
         return None
 
 def get_response_time(url):
-    params = {'query': 'json_endpoint_response_time_seconds_sum{job="swarm-service"} / json_endpoint_response_time_seconds_count{job="swarm-service"}'}
+    # Calculate avg response time in last 30s
+    promql = 'rate(json_endpoint_response_time_seconds_sum{job="swarm-service"}[30s]) \
+              / rate(json_endpoint_response_time_seconds_count{job="swarm-service"}[30s])'
+    
+    params = {'query': promql}
     try:
         response = requests.get(url, params=params)
         if response.status_code == 200:
             data = response.json()
-            if data is not None and 'data' in data and 'result' in data['data']:
+            if data and 'data' in data and 'result' in data['data']:
                 results = data['data']['result']
                 if results:
-                    metric_value = results[0]['value'][1]
+                    metric_value = float(results[0]['value'][1])
                     return metric_value
             return None
         else:
+            print("Prometheus query failed:", response.status_code, response.text)
             return None
     except Exception as e:
         print("An error occurred during response time retrieval:", e)
