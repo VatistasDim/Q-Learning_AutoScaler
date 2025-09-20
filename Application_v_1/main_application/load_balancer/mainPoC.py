@@ -134,7 +134,14 @@ state_to_idx = {s: i for i, s in enumerate(states)}
 # ----------------------------
 actions = [("vscale", -10), ("hscale", -1), ("noop", 0), ("hscale", +1), ("vscale", +10)]
 n_actions = len(actions)
+
 Q = np.zeros((len(states), n_actions))
+
+log_file = "/logs/q-learning-steps.txt"
+os.makedirs(os.path.dirname(log_file), exist_ok=True)
+
+with open(log_file, "w") as lf:
+    lf.write("=== Q-Learning Training Log ===\n\n")
 
 # ----------------------------
 # Training loop
@@ -195,6 +202,15 @@ for ep in range(episodes):
         state = next_state
 
         # Log step
+        step_log = (
+            f"[Episode {ep+1}, Step {step+1}] "
+            f"State={state}, Action={action}, Response={R_next:.2f}, "
+            f"Cost={costs['total']:.4f} "
+            f"(Adapt={costs['term1']:.4f}, Perf={costs['term2']:.4f}, Res={costs['term3']:.4f})")
+        print(step_log)
+        with open(log_file, "a") as lf:
+            lf.write(step_log + "\n")
+
         step_logs.append({
             "step": step + 1,
             "state": state,
@@ -213,36 +229,38 @@ for ep in range(episodes):
     # --- Episode summary ---
     avg_k = total_k / steps_per_episode
     avg_c = total_c / steps_per_episode
-    learning_report["episodes"].append({
-        "episode": ep + 1,
-        "total_cost": total_cost,
-        "performance_met_percentage": performance_met / steps_per_episode * 100,
-        "scaling_frequency_percentage": scaling_steps / steps_per_episode * 100,
-        "avg_replicas": avg_k,
-        "avg_cpu_shares": avg_c,
-        "step_logs": step_logs
-    })
+    summary = (
+        f"--- Episode {ep+1} Summary ---\n"
+        f"Total Cost: {total_cost:.4f}\n"
+        f"Performance Met: {performance_met / steps_per_episode * 100:.2f}%\n"
+        f"Scaling Frequency: {scaling_steps / steps_per_episode * 100:.2f}%\n"
+        f"Average Replicas: {avg_k:.2f}, Average CPU: {avg_c:.2f}\n"
+        "------------------------------\n\n"
+    )
+    print(summary)
+    with open(log_file, "a") as lf:
+        lf.write(summary)
 
 # --- Best/Worst actions per state ---
-for s in states:
-    s_idx = state_to_idx[s]
-    best_idx = np.argmin(Q[s_idx, :])
-    worst_idx = np.argmax(Q[s_idx, :])
-    learning_report["best_actions_per_state"][s] = {"action": actions[best_idx], "cost": Q[s_idx, best_idx]}
-    learning_report["worst_actions_per_state"][s] = {"action": actions[worst_idx], "cost": Q[s_idx, worst_idx]}
+# for s in states:
+#     s_idx = state_to_idx[s]
+#     best_idx = np.argmin(Q[s_idx, :])
+#     worst_idx = np.argmax(Q[s_idx, :])
+#     learning_report["best_actions_per_state"][s] = {"action": actions[best_idx], "cost": Q[s_idx, best_idx]}
+#     learning_report["worst_actions_per_state"][s] = {"action": actions[worst_idx], "cost": Q[s_idx, worst_idx]}
 
-# --- Overall statistics ---
-total_episodes = len(learning_report["episodes"])
-learning_report["overall_statistics"] = {
-    "avg_total_cost": np.mean([ep["total_cost"] for ep in learning_report["episodes"]]),
-    "avg_performance_met_percentage": np.mean([ep["performance_met_percentage"] for ep in learning_report["episodes"]]),
-    "avg_scaling_frequency_percentage": np.mean([ep["scaling_frequency_percentage"] for ep in learning_report["episodes"]])
-}
+# # --- Overall statistics ---
+# total_episodes = len(learning_report["episodes"])
+# learning_report["overall_statistics"] = {
+#     "avg_total_cost": np.mean([ep["total_cost"] for ep in learning_report["episodes"]]),
+#     "avg_performance_met_percentage": np.mean([ep["performance_met_percentage"] for ep in learning_report["episodes"]]),
+#     "avg_scaling_frequency_percentage": np.mean([ep["scaling_frequency_percentage"] for ep in learning_report["episodes"]])
+# }
 
-# --- Save JSON report ---
-report_file = "/logs/q-learning-detailed.json"
-os.makedirs(os.path.dirname(report_file), exist_ok=True)
-with open(report_file, "w") as f:
-    json.dump(learning_report, f, indent=2)
+# # --- Save JSON report ---
+# report_file = "/logs/q-learning-detailed.json"
+# os.makedirs(os.path.dirname(report_file), exist_ok=True)
+# with open(report_file, "w") as f:
+#     json.dump(learning_report, f, indent=2)
 
-print(f"Training finished. Full report saved to {report_file}")
+# print(f"Training finished. Full report saved to {report_file}")
