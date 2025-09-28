@@ -75,7 +75,7 @@ def scale_in(service_name, scale_factor=1):
 # ----------------------------
 def set_cpu_limit(service_name, cpu_limit, retry_attempts=5, wait_time=2):
     client = docker.from_env()
-    desired_nano_cpus = int(cpu_limit * 1e9)  # π.χ. 0.5 CPU -> 500_000_000 NanoCPUs
+    desired_nano_cpus = int(cpu_limit * 1e9)
 
     for attempt in range(retry_attempts):
         try:
@@ -89,7 +89,6 @@ def set_cpu_limit(service_name, cpu_limit, retry_attempts=5, wait_time=2):
             resources['Limits']['NanoCPUs'] = desired_nano_cpus
             task_template['Resources'] = resources
 
-            # Κλήση με positional args (4.4.4, Python 2.7)
             service.update(
                 spec['Name'],               # name
                 spec.get('Labels', {}),     # labels
