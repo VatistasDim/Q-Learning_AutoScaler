@@ -6,8 +6,8 @@ import json
 from scalingOperations import (
     scale_out,
     scale_in,
-    set_cpu_shares,
-    calculate_cpu_shares,
+    set_cpu_limit,
+    normalize_cpu_fraction,
     get_current_replica_count,
     get_current_cpu_shares
 )
@@ -58,7 +58,7 @@ PROM_URL = "http://prometheus:9090/api/v1/query"
 # ----------------------------
 def discretize(value, quantum, v_min, v_max):
     value = max(v_min, min(value, v_max))
-    return int(round(value / quantum) * quantum)
+    return int(round(value / quantum) * quantum) # Check if goes up after rounding. remove / Quantum and * quantum.
 
 def fetch_data(service_name="mystack_application", max_attempts=30, retry_delay=5):
     for attempt in range(max_attempts):
@@ -94,7 +94,7 @@ def apply_action(service_name, state, action, prometheus_url=None):
     elif action[0] == "vscale":
         new_cpu = c + action[1]
         new_cpu = max(c_quantum, min(new_cpu, c_max))
-        set_cpu_shares(service_name, calculate_cpu_shares(new_cpu / 10))
+        set_cpu_limit(service_name, normalize_cpu_fraction(new_cpu / 10))
     # noop does nothing
     
     time.sleep(30)
