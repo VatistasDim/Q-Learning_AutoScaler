@@ -75,39 +75,43 @@ def scale_in(service_name, scale_factor=1):
 # ----------------------------
 def set_cpu_limit(service_name, cpu_limit, retry_attempts=5, wait_time=2):
     client = docker.from_env()
-    desired_nano_cpus = int(cpu_limit * 1_000_000_000)
+    desired_nano_cpus = int(cpu_limit * 1e9)  # π.χ. 0.5 CPU -> 500_000_000 NanoCPUs
 
     for attempt in range(retry_attempts):
         try:
             service = client.services.get(service_name)
             spec = service.attrs['Spec']
-
             task_template = spec['TaskTemplate']
+
             resources = task_template.get('Resources', {})
             if 'Limits' not in resources:
                 resources['Limits'] = {}
             resources['Limits']['NanoCPUs'] = desired_nano_cpus
-
             task_template['Resources'] = resources
 
+            # Κλήση με positional args (4.4.4, Python 2.7)
             service.update(
-                task_template=task_template,
-                labels=spec.get('Labels', {}),
-                name=spec['Name']
+                spec['Name'],               # name
+                spec.get('Labels', {}),     # labels
+                None,                       # mode
+                None,                       # update_config
+                None,                       # networks
+                None,                       # endpoint_config
+                task_template               # task_template
             )
 
-            print(f"[OK] Set {cpu_limit} CPUs ({desired_nano_cpus} NanoCPUs) for service '{service_name}'")
+            print("[OK] Set {} CPUs ({} NanoCPUs) for '{}'".format(cpu_limit, desired_nano_cpus, service_name))
             time.sleep(wait_time)
             return True
 
         except docker.errors.NotFound:
-            print(f"[ERROR] Service '{service_name}' not found.")
+            print("[ERROR] Service '{}' not found.".format(service_name))
             break
         except Exception as e:
-            print(f"[WARN] Attempt {attempt+1} failed with error: {e}. Retrying in {wait_time} seconds...")
+            print("[WARN] Attempt {} failed: {}. Retrying in {}s...".format(attempt+1, e, wait_time))
             time.sleep(wait_time)
 
-    print(f"[FAIL] Could not set CPU limit for '{service_name}' after {retry_attempts} attempts.")
+    print("[FAIL] Could not set CPU limit for '{}' after {} attempts.".format(service_name, retry_attempts))
     return False
 # ----------------------------
 # CPU share calculation helper
