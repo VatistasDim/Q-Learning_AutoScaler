@@ -73,30 +73,52 @@ def scale_in(service_name, scale_factor=1):
 # ----------------------------
 # CPU share operations
 # ----------------------------
-def set_cpu_limit(service_name, cpu_limit, retry_attempts=5, wait_time=2):
-    client = docker.from_env()
-    desired_nano_cpus = int(cpu_limit * 1e9)
+import time
+import docker
 
-    for attempt in range(retry_attempts):
+def set_cpu_limit(service_name, cpu_limit, retry_attempts=5, wait_time=2):
+    """
+    Set CPU limit for a swarm service.
+    cpu_limit: float (π.χ. 0.5, 1.0, 2.0) => μετατρέπεται σε NanoCPUs (int).
+    Επιστρέφει True αν επιτύχει, False αλλιώς.
+    """
+    client = docker.from_env()
+    try:
+        desired_nano_cpus = int(float(cpu_limit) * 1e9)
+    except Exception:
+        print("[ERROR] cpu_limit must be a number (e.g. 0.5, 1.0).")
+        return False
+
+    for attempt in range(1, retry_attempts + 1):
         try:
             service = client.services.get(service_name)
-            spec = service.attrs['Spec']
-            task_template = spec['TaskTemplate']
+            spec = service.attrs.get('Spec', {})
+            task_template = spec.get('TaskTemplate', {})
 
-            resources = task_template.get('Resources', {})
-            if 'Limits' not in resources:
-                resources['Limits'] = {}
-            resources['Limits']['NanoCPUs'] = desired_nano_cpus
+            # Ensure Resources / Limits dicts υφίστανται
+            resources = task_template.get('Resources') or {}
+            limits = resources.get('Limits') or {}
+            limits['NanoCPUs'] = desired_nano_cpus
+            resources['Limits'] = limits
             task_template['Resources'] = resources
+            spec['TaskTemplate'] = task_template
 
-            service.update(
-                spec['Name'],               # name
-                spec.get('Labels', {}),     # labels
-                None,                       # mode
-                None,                       # update_config
-                None,                       # networks
-                None,                       # endpoint_config
-                task_template               # task_template
+            # Πάρε την τρέχουσα version index — απαιτείται από το update
+            version = service.attrs.get('Version', {}).get('Index')
+            if version is None:
+                raise RuntimeError("Could not read service Version.Index")
+
+            # Χρησιμοποιούμε το low-level API update_service με version ως δεύτερο arg
+            client.api.update_service(
+                service.id,
+                version,
+                task_template=task_template,
+                name=spec.get('Name'),
+                labels=spec.get('Labels'),
+                mode=spec.get('Mode'),
+                update_config=spec.get('UpdateConfig'),
+                networks=spec.get('Networks'),
+                endpoint_spec=spec.get('EndpointSpec')
             )
 
             print("[OK] Set {} CPUs ({} NanoCPUs) for '{}'".format(cpu_limit, desired_nano_cpus, service_name))
@@ -105,13 +127,17 @@ def set_cpu_limit(service_name, cpu_limit, retry_attempts=5, wait_time=2):
 
         except docker.errors.NotFound:
             print("[ERROR] Service '{}' not found.".format(service_name))
-            break
+            return False
+        except docker.errors.APIError as e:
+            print(f"[WARN] Docker API error on attempt {attempt}: {e}. Retrying in {wait_time}s...")
+            time.sleep(wait_time)
         except Exception as e:
-            print("[WARN] Attempt {} failed: {}. Retrying in {}s...".format(attempt+1, e, wait_time))
+            print(f"[WARN] Attempt {attempt} failed: {e}. Retrying in {wait_time}s...")
             time.sleep(wait_time)
 
     print("[FAIL] Could not set CPU limit for '{}' after {} attempts.".format(service_name, retry_attempts))
     return False
+
 # ----------------------------
 # CPU share calculation helper
 # ----------------------------
