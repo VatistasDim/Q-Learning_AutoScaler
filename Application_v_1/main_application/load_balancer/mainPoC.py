@@ -32,7 +32,8 @@ Kmax = 10        # maximum containers
 u_max = 100      # CPU utilization (%)
 c_max = 100      # CPU shares
 u_quantum = 10
-c_quantum = 10
+c_quantum = 5   # 5 = 0.5 cores
+c_max = 20      # 20 = 2 cores
 STEP_DURATION = 10  # seconds
 
 docker_api = DockerAPI(stack_name="mystack_application")
@@ -71,7 +72,7 @@ def fetch_data(service_name="mystack_application", max_attempts=30, retry_delay=
 
             cpu_percent = int(float(cpu_percent))
             response_time = float(response_time)
-            cpu_shares = calculate_cpu_shares(get_current_cpu_shares(service_name))
+            cpu_shares = get_current_cpu_shares(service_name)
 
             return cpu_percent, response_time, cpu_shares
 
@@ -94,14 +95,14 @@ def apply_action(service_name, state, action, prometheus_url=None):
     elif action[0] == "vscale":
         new_cpu = c + action[1]
         new_cpu = max(c_quantum, min(new_cpu, c_max))
+        # normalize_cpu_fraction: c=5 → 0.5 cores, c=10 → 1 core ...
         set_cpu_limit(service_name, normalize_cpu_fraction(new_cpu / 10))
     # noop does nothing
-    
+
     time.sleep(30)
 
     # --- Get metrics ---
     cpu_percent, response_time, cpu_shares = fetch_data()
-
     if response_time is None:
         response_time = u
     if cpu_shares is None:
@@ -134,7 +135,14 @@ state_to_idx = {s: i for i, s in enumerate(states)}
 # ----------------------------
 # Actions
 # ----------------------------
-actions = [("vscale", -10), ("hscale", -1), ("noop", 0), ("hscale", +1), ("vscale", +10)]
+actions = [
+    ("vscale", -5),
+    ("hscale", -1),
+    ("noop", 0),
+    ("hscale", +1),
+    ("vscale", +5)
+]
+n_actions = len(actions)
 n_actions = len(actions)
 
 Q = np.zeros((len(states), n_actions))
