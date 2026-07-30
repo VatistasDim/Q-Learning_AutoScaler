@@ -39,11 +39,10 @@ STEP_DURATION = 10  # seconds
 docker_api = DockerAPI(stack_name="mystack_application")
 
 # Q-learning parameters
-episodes = 2
-steps_per_episode = 3
+episodes = 10
+steps_per_episode = 100
 alpha = 0.1
 gamma = 0.95
-epsilon = 0.1
 
 # Scaling & cost parameters
 Rmax = 0.80  # max acceptable response time
@@ -143,9 +142,23 @@ actions = [
     ("vscale", +5)
 ]
 n_actions = len(actions)
-n_actions = len(actions)
 
 Q = np.zeros((len(states), n_actions))
+
+def get_valid_action_indices(state):
+    k, u, c = state
+    valid = []
+    for i, act in enumerate(actions):
+        if act == ("hscale", -1) and k <= 1:
+            continue
+        if act == ("hscale", +1) and k >= Kmax:
+            continue
+        if act == ("vscale", -5) and c <= c_quantum:
+            continue
+        if act == ("vscale", +5) and c >= c_max:
+            continue
+        valid.append(i)
+    return valid
 
 log_file = "/logs/q-learning-steps.txt"
 os.makedirs(os.path.dirname(log_file), exist_ok=True)
@@ -168,9 +181,9 @@ for ep in range(episodes):
     performance_met = 0
     scaling_steps = 0
     step_logs = []
-
+    
     for step in range(steps_per_episode):
-        
+        epsilon = 1 / (step + 1)
         step_start = time.time()
         k, u, c = state
         state = (
@@ -180,7 +193,11 @@ for ep in range(episodes):
         )
         s_idx = state_to_idx[state]
 
-        a_idx = np.random.randint(n_actions) if random.random() < epsilon else np.argmin(Q[s_idx, :])
+        valid_indices = get_valid_action_indices(state)
+        if random.random() < epsilon:
+            a_idx = random.choice(valid_indices)
+        else:
+            a_idx = min(valid_indices, key=lambda i: Q[s_idx, i])
         action = actions[a_idx]
 
         a1 = action[1] if action[0] == "hscale" else 0
@@ -194,11 +211,10 @@ for ep in range(episodes):
             u_next_state=next_state[1],
             c_next_state=next_state[2],
             action=action, a1=a1, a2=a2,
-            Rmax=Rmax, Kmax=Kmax,
-            response_time=R_next
+            Rmax=Rmax, Kmax=Kmax, response_time=R_next
         )
 
-        total_cost = costs["total"]
+        total_cost += costs["total"]
         total_k += next_state[0]
         total_c += next_state[2]
         if R_next <= Rmax:
@@ -208,7 +224,8 @@ for ep in range(episodes):
 
         # Q-update
         s_next_idx = state_to_idx[next_state]
-        Q[s_idx, a_idx] = (1 - alpha) * Q[s_idx, a_idx] + alpha * (costs["total"] + gamma * np.min(Q[s_next_idx, :]))
+        valid_next = get_valid_action_indices(next_state)
+        Q[s_idx, a_idx] = (1 - alpha) * Q[s_idx, a_idx] + alpha * (costs["total"] + gamma * np.min(Q[s_next_idx, valid_next]))
         state = next_state
 
         # Log step
