@@ -13,6 +13,7 @@ from scalingOperations import (
 )
 from costs import Costs
 from docker_api import DockerAPI
+from settings import load_settings
 import prometheus_metrics
 
 # ----------------------------
@@ -38,9 +39,14 @@ STEP_DURATION = 10  # seconds
 
 docker_api = DockerAPI(stack_name="mystack_application")
 
+settings = load_settings("ApplicationSettings/applicationSettings.txt")
+baseline = settings.get("baseline", False)
+
 # Q-learning parameters
-episodes = 10
-steps_per_episode = 100
+episodes = settings.get("episodes", 10)
+steps_per_episode = settings.get("steps_per_episode", 100)
+action_sleep_seconds = settings.get("action_sleep_seconds", 30)
+q_table_path = settings.get("q_table_path", "/logs/q_table.npy")
 alpha = 0.1
 gamma = 0.95
 
@@ -96,9 +102,9 @@ def apply_action(service_name, state, action, prometheus_url=None):
         new_cpu = max(c_quantum, min(new_cpu, c_max))
         # normalize_cpu_fraction: c=5 → 0.5 cores, c=10 → 1 core ...
         set_cpu_limit(service_name, normalize_cpu_fraction(new_cpu / 10))
-    # noop does nothing
-
-    time.sleep(30)
+    # noop does nothing, no need to wait for a scaling action to settle
+    if action[0] != "noop":
+        time.sleep(action_sleep_seconds)
 
     # --- Get metrics ---
     cpu_percent, response_time, cpu_shares = fetch_data()
@@ -145,6 +151,17 @@ n_actions = len(actions)
 
 Q = np.zeros((len(states), n_actions))
 
+if not baseline and os.path.exists(q_table_path):
+    try:
+        loaded_q = np.load(q_table_path)
+        if loaded_q.shape == Q.shape:
+            Q = loaded_q
+            print(f"[Q] Loaded saved table from {q_table_path}")
+        else:
+            print(f"[Q] Saved table shape {loaded_q.shape} != expected {Q.shape}, starting fresh.")
+    except Exception as e:
+        print(f"[Q] Failed to load saved table ({e}), starting fresh.")
+
 def get_valid_action_indices(state):
     k, u, c = state
     valid = []
@@ -160,11 +177,11 @@ def get_valid_action_indices(state):
         valid.append(i)
     return valid
 
-log_file = "/logs/q-learning-steps.txt"
+log_file = "/logs/baseline-steps.txt" if baseline else "/logs/q-learning-steps.txt"
 os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
 with open(log_file, "w") as lf:
-    lf.write("=== Q-Learning Training Log ===\n\n")
+    lf.write("=== Baseline Run Log ===\n\n" if baseline else "=== Q-Learning Training Log ===\n\n")
 
 # ----------------------------
 # Training loop
@@ -193,12 +210,16 @@ for ep in range(episodes):
         )
         s_idx = state_to_idx[state]
 
-        valid_indices = get_valid_action_indices(state)
-        if random.random() < epsilon:
-            a_idx = random.choice(valid_indices)
+        if baseline:
+            action = ("noop", 0)
+            a_idx = None
         else:
-            a_idx = min(valid_indices, key=lambda i: Q[s_idx, i])
-        action = actions[a_idx]
+            valid_indices = get_valid_action_indices(state)
+            if random.random() < epsilon:
+                a_idx = random.choice(valid_indices)
+            else:
+                a_idx = min(valid_indices, key=lambda i: Q[s_idx, i])
+            action = actions[a_idx]
 
         a1 = action[1] if action[0] == "hscale" else 0
         a2 = action[1] if action[0] == "vscale" else 0
@@ -223,9 +244,10 @@ for ep in range(episodes):
             scaling_steps += 1
 
         # Q-update
-        s_next_idx = state_to_idx[next_state]
-        valid_next = get_valid_action_indices(next_state)
-        Q[s_idx, a_idx] = (1 - alpha) * Q[s_idx, a_idx] + alpha * (costs["total"] + gamma * np.min(Q[s_next_idx, valid_next]))
+        if not baseline:
+            s_next_idx = state_to_idx[next_state]
+            valid_next = get_valid_action_indices(next_state)
+            Q[s_idx, a_idx] = (1 - alpha) * Q[s_idx, a_idx] + alpha * (costs["total"] + gamma * np.min(Q[s_next_idx, valid_next]))
         state = next_state
 
         # Log step
@@ -268,26 +290,39 @@ for ep in range(episodes):
     with open(log_file, "a") as lf:
         lf.write(summary)
 
-# --- Best/Worst actions per state ---
-# for s in states:
-#     s_idx = state_to_idx[s]
-#     best_idx = np.argmin(Q[s_idx, :])
-#     worst_idx = np.argmax(Q[s_idx, :])
-#     learning_report["best_actions_per_state"][s] = {"action": actions[best_idx], "cost": Q[s_idx, best_idx]}
-#     learning_report["worst_actions_per_state"][s] = {"action": actions[worst_idx], "cost": Q[s_idx, worst_idx]}
+    learning_report["episodes"].append({
+        "episode": ep + 1,
+        "total_cost": total_cost,
+        "performance_met_percentage": performance_met / steps_per_episode * 100,
+        "scaling_frequency_percentage": scaling_steps / steps_per_episode * 100,
+        "avg_replicas": avg_k,
+        "avg_cpu_shares": avg_c
+    })
 
-# # --- Overall statistics ---
-# total_episodes = len(learning_report["episodes"])
-# learning_report["overall_statistics"] = {
-#     "avg_total_cost": np.mean([ep["total_cost"] for ep in learning_report["episodes"]]),
-#     "avg_performance_met_percentage": np.mean([ep["performance_met_percentage"] for ep in learning_report["episodes"]]),
-#     "avg_scaling_frequency_percentage": np.mean([ep["scaling_frequency_percentage"] for ep in learning_report["episodes"]])
-# }
+    if not baseline:
+        os.makedirs(os.path.dirname(q_table_path), exist_ok=True)
+        np.save(q_table_path, Q)
 
-# # --- Save JSON report ---
-# report_file = "/logs/q-learning-detailed.json"
-# os.makedirs(os.path.dirname(report_file), exist_ok=True)
-# with open(report_file, "w") as f:
-#     json.dump(learning_report, f, indent=2)
+if not baseline:
+    # --- Best/Worst actions per state ---
+    for s in states:
+        s_idx = state_to_idx[s]
+        best_idx = int(np.argmin(Q[s_idx, :]))
+        worst_idx = int(np.argmax(Q[s_idx, :]))
+        learning_report["best_actions_per_state"][str(s)] = {"action": actions[best_idx], "cost": float(Q[s_idx, best_idx])}
+        learning_report["worst_actions_per_state"][str(s)] = {"action": actions[worst_idx], "cost": float(Q[s_idx, worst_idx])}
 
-# print(f"Training finished. Full report saved to {report_file}")
+    # --- Overall statistics ---
+    learning_report["overall_statistics"] = {
+        "avg_total_cost": float(np.mean([ep["total_cost"] for ep in learning_report["episodes"]])),
+        "avg_performance_met_percentage": float(np.mean([ep["performance_met_percentage"] for ep in learning_report["episodes"]])),
+        "avg_scaling_frequency_percentage": float(np.mean([ep["scaling_frequency_percentage"] for ep in learning_report["episodes"]]))
+    }
+
+    # --- Save JSON report ---
+    report_file = "/logs/q-learning-detailed.json"
+    os.makedirs(os.path.dirname(report_file), exist_ok=True)
+    with open(report_file, "w") as f:
+        json.dump(learning_report, f, indent=2)
+
+    print(f"Training finished. Full report saved to {report_file}")
